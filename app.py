@@ -9,6 +9,8 @@ import pdfplumber
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+import json
+import base64
 
 # =========================
 # CONFIG
@@ -16,7 +18,7 @@ from google.oauth2.service_account import Credentials
 PLANILHA_URL = "https://docs.google.com/spreadsheets/d/1XQ8VMo_O5i8KLQWmb_s4xrBuisUQUgdmgQw5xoCu-ms"
 
 # =========================
-# GOOGLE SHEETS (CORRIGIDO)
+# GOOGLE SHEETS
 # =========================
 def conectar_gsheet():
     creds_dict = st.secrets["gcp_service_account"]
@@ -44,8 +46,7 @@ def preparar_datas(data_str):
         "mm": dt.strftime("%m"),
         "dd": dt.strftime("%d"),
         "yyyymmdd": dt.strftime("%Y%m%d"),
-        "iso_exec": dt.strftime("%Y-%m-%dT06:00:00.000Z"),
-        "data_planilha": dt.strftime("%Y-%m-%d 00:00:00")
+        "iso_exec": dt.strftime("%Y-%m-%dT06:00:00.000Z")
     }
 
 
@@ -60,7 +61,7 @@ def montar_urls(d):
 
 
 # =========================
-# DOWNLOADS (CORRIGIDO)
+# DOWNLOAD
 # =========================
 def baixar(url):
     r = requests.get(url, timeout=60)
@@ -68,23 +69,57 @@ def baixar(url):
     return r.content
 
 
-def extrair_pdf_exec(html):
-    matches = re.findall(r'https://.*?\.pdf', html)
-    return matches[0] if matches else None
+# =========================
+# EXECUTIVO (API CORRETA)
+# =========================
+def baixar_pdf_jornal_mg_por_link(url_pagina: str) -> bytes:
+    try:
+        match = re.search(r'dados=([^&]+)', url_pagina)
+        if not match:
+            raise Exception("Parâmetro dados não encontrado")
 
+        dados_codificados = match.group(1)
+        json_str = requests.utils.unquote(dados_codificados)
+        dados = json.loads(json_str)
 
-def baixar_exec(url):
-    r = requests.get(url, timeout=60)
-    pdf_url = extrair_pdf_exec(r.text)
+        data_iso = dados["dataPublicacaoSelecionada"]
+        data = data_iso.split("T")[0]
 
-    if not pdf_url:
-        raise Exception("PDF do Executivo não encontrado")
+        api_url = f"https://www.jornalminasgerais.mg.gov.br/api/v1/Jornal/ObterEdicaoPorDataPublicacao?dataPublicacao={data}"
 
-    return baixar(pdf_url)
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Referer": "https://www.jornalminasgerais.mg.gov.br/"
+        }
+
+        r = requests.get(api_url, headers=headers, timeout=60)
+        r.raise_for_status()
+
+        dados_api = r.json()
+
+        base64_pdf = dados_api["dados"]["arquivoCadernoPrincipal"]["arquivo"]
+        pdf_bytes = base64.b64decode(base64_pdf)
+
+        return pdf_bytes
+
+    except Exception as e:
+        raise Exception(f"Erro ao obter PDF do Executivo: {e}")
 
 
 # =========================
-# STREAMLIT UI
+# =========================
+# 🔴 CLASSES (SEM ALTERAÇÃO)
+# =========================
+# =========================
+
+# 👉 COLE AQUI EXATAMENTE SUAS CLASSES:
+# - LegislativeProcessor
+# - AdministrativeProcessor
+# - ExecutiveProcessor
+# (não vou repetir aqui porque já estão corretas e enormes)
+
+# =========================
+# STREAMLIT
 # =========================
 st.title("📄 Diário MG → Automação")
 
@@ -99,7 +134,7 @@ if st.button("Processar"):
 
     # ================= EXECUTIVO =================
     try:
-        pdf_exec = baixar_exec(urls["executivo_html"])
+        pdf_exec = baixar_pdf_jornal_mg_por_link(urls["executivo_html"])
         exec_proc = ExecutiveProcessor(pdf_exec)
         df_exec = exec_proc.process_pdf()
         st.success(f"Executivo OK ({len(df_exec)} registros)")
@@ -121,7 +156,6 @@ if st.button("Processar"):
     try:
         sheet = conectar_gsheet()
 
-        # escreve simples (teste inicial)
         if not df_exec.empty:
             data_out = [df_exec.columns.tolist()] + df_exec.values.tolist()
             sheet.update("A1", data_out)
