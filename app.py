@@ -18,34 +18,21 @@ import base64
 PLANILHA_URL = "https://docs.google.com/spreadsheets/d/1XQ8VMo_O5i8KLQWmb_s4xrBuisUQUgdmgQw5xoCu-ms"
 
 # =========================
-# ================= GOOGLE SHEETS =================
-try:
-    sheet = conectar_gsheet()
+# GOOGLE SHEETS
+# =========================
+def conectar_gsheet():
+    creds_dict = st.secrets["gcp_service_account"]
 
-    frames = []
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+    )
 
-    if not df_exec.empty:
-        df_exec = df_exec.copy()
-        df_exec["Origem"] = "Executivo"
-        frames.append(df_exec)
-
-    if not df_leg.empty:
-        df_leg = df_leg.copy()
-        df_leg["Origem"] = "Legislativo"
-        frames.append(df_leg)
-
-    if frames:
-        df_final = pd.concat(frames, ignore_index=True)
-
-        data_out = [df_final.columns.tolist()] + df_final.values.tolist()
-        sheet.update("A1", data_out)
-
-        st.success(f"Planilha atualizada 🚀 ({len(df_final)} registros)")
-    else:
-        st.warning("Nada para enviar para a planilha")
-
-except Exception as e:
-    st.error(f"Erro Google Sheets: {e}")
+    client = gspread.authorize(creds)
+    return client.open_by_url(PLANILHA_URL).sheet1
 
 
 # =========================
