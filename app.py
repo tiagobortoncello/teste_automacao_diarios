@@ -1087,27 +1087,39 @@ if st.button("Processar"):
         df_leg = pd.DataFrame()
 
     # ================= GOOGLE SHEETS =================
+        # ================= GOOGLE SHEETS =================
     try:
         sheet = conectar_gsheet()
 
         frames = []
 
+        COLS = ["Página", "Coluna", "Sanção", "Tipo", "Número", "Ano", "Alterações", "Origem"]
+
         if not df_exec.empty:
             df_exec = df_exec.copy()
+
+            # garante Ano
+            if "Sanção" in df_exec.columns:
+                df_exec["Ano"] = df_exec["Sanção"].str[-4:]
+            else:
+                df_exec["Ano"] = ""
+
             df_exec["Origem"] = "Executivo"
+            df_exec = df_exec.reindex(columns=COLS)
+
             frames.append(df_exec)
 
         if not df_leg.empty:
             df_leg = df_leg.copy()
-            df_leg = df_leg.rename(columns={"Sigla": "Tipo"})
-            df_leg["Alterações"] = ""
+
             df_leg["Origem"] = "Legislativo"
+            df_leg = df_leg.reindex(columns=COLS)
+
             frames.append(df_leg)
 
         if frames:
             df_final = pd.concat(frames, ignore_index=True)
 
-    # 🔴 COLOCA AQUI
             df_final = df_final.fillna("")
 
             data_out = [df_final.columns.tolist()] + df_final.values.tolist()
