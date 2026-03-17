@@ -1065,5 +1065,5 @@ if st.button("Processar"):
         else:
             st.warning("Nada para enviar")
 
-except Exception as e:
-    st.error(f"Erro Google Sheets: {e}")
+    except Exception as e:
+        st.error(f"Erro Google Sheets: {e}")
