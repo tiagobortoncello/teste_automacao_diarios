@@ -1031,7 +1031,56 @@ if st.button("Processar"):
     try:
         pdf_leg = baixar(urls["legislativo"])
         leg_proc = LegislativeProcessor(pdf_leg)
-        df_leg = leg_proc.process_all()["Normas"]
+        dados_leg = leg_proc.process_all()
+
+frames_leg = []
+
+# Normas
+        if not dados_leg["Normas"].empty:
+            df = dados_leg["Normas"].copy()
+            df = df.rename(columns={"Sigla": "Tipo"})
+            df["Alterações"] = ""
+            df["Origem"] = "Legislativo - Norma"
+            frames_leg.append(df)
+
+# Proposições
+        if not dados_leg["Proposicoes"].empty:
+            df = dados_leg["Proposicoes"].copy()
+            df = df.rename(columns={"Sigla": "Tipo"})
+            df["Página"] = ""
+            df["Coluna"] = ""
+            df["Sanção"] = ""
+            df["Alterações"] = ""
+            df["Origem"] = "Legislativo - Proposição"
+            frames_leg.append(df)
+
+# Requerimentos
+        if not dados_leg["Requerimentos"].empty:
+            df = dados_leg["Requerimentos"].copy()
+            df = df.rename(columns={"Sigla": "Tipo"})
+            df["Página"] = ""
+            df["Coluna"] = ""
+            df["Sanção"] = ""
+            df["Alterações"] = ""
+            df["Origem"] = "Legislativo - Requerimento"
+            frames_leg.append(df)
+
+# Pareceres
+        if not dados_leg["Pareceres"].empty:
+            df = dados_leg["Pareceres"].copy()
+            df = df.rename(columns={"Sigla": "Tipo"})
+            df["Página"] = ""
+            df["Coluna"] = ""
+            df["Sanção"] = ""
+            df["Alterações"] = ""
+            df["Origem"] = "Legislativo - Parecer"
+            frames_leg.append(df)
+
+# Junta tudo
+        if frames_leg:
+            df_leg = pd.concat(frames_leg, ignore_index=True)
+        else:
+            df_leg = pd.DataFrame()
         st.success(f"Legislativo OK ({len(df_leg)} registros)")
     except Exception as e:
         st.error(f"Erro Legislativo: {e}")
