@@ -1035,56 +1035,51 @@ if st.button("Processar"):
 
         frames_leg = []
 
-# Normas
-        if not dados_leg["Normas"].empty:
-            df = dados_leg["Normas"].copy()
-            df = df.rename(columns={"Sigla": "Tipo"})
-            df["Alterações"] = ""
-            df["Origem"] = "Legislativo - Norma"
-            frames_leg.append(df)
+# ================= NORMAS =================
+if not dados_leg["Normas"].empty:
+    df = dados_leg["Normas"].copy()
+    df = df.rename(columns={"Sigla": "Tipo"})
+    df["Alterações"] = ""
+    df["Origem"] = "Legislativo - Norma"
+    frames_leg.append(df)
 
-# Proposições
-        if not dados_leg["Proposicoes"].empty:
-            df = dados_leg["Proposicoes"].copy()
-            df = df.rename(columns={"Sigla": "Tipo"})
-            df["Página"] = ""
-            df["Coluna"] = ""
-            df["Sanção"] = ""
-            df["Alterações"] = ""
-            df["Origem"] = "Legislativo - Proposição"
-            frames_leg.append(df)
+# ================= PROPOSIÇÕES =================
+if not dados_leg["Proposicoes"].empty:
+    df = dados_leg["Proposicoes"].copy()
+    df = df.rename(columns={"Sigla": "Tipo"})
+    df["Página"] = df["Coluna"] = df["Sanção"] = df["Alterações"] = ""
+    df["Origem"] = "Legislativo - Proposição"
+    frames_leg.append(df)
 
-# Requerimentos
-        if not dados_leg["Requerimentos"].empty:
-            df = dados_leg["Requerimentos"].copy()
-            df = df.rename(columns={"Sigla": "Tipo"})
-            df["Página"] = ""
-            df["Coluna"] = ""
-            df["Sanção"] = ""
-            df["Alterações"] = ""
-            df["Origem"] = "Legislativo - Requerimento"
-            frames_leg.append(df)
+# ================= REQUERIMENTOS =================
+if not dados_leg["Requerimentos"].empty:
+    df = dados_leg["Requerimentos"].copy()
+    df = df.rename(columns={"Sigla": "Tipo"})
+    df["Página"] = df["Coluna"] = df["Sanção"] = df["Alterações"] = ""
+    df["Origem"] = "Legislativo - Requerimento"
+    frames_leg.append(df)
 
-# Pareceres
-        if not dados_leg["Pareceres"].empty:
-            df = dados_leg["Pareceres"].copy()
-            df = df.rename(columns={"Sigla": "Tipo"})
-            df["Página"] = ""
-            df["Coluna"] = ""
-            df["Sanção"] = ""
-            df["Alterações"] = ""
-            df["Origem"] = "Legislativo - Parecer"
-            frames_leg.append(df)
+# ================= PARECERES (FIX DO ERRO) =================
+if not dados_leg["Pareceres"].empty:
+    df = dados_leg["Pareceres"].copy()
+    df = df.rename(columns={"Sigla": "Tipo", "Tipo": "Parecer"})  # ← renomeia o antigo 'Tipo' primeiro
+    df["Página"] = df["Coluna"] = df["Sanção"] = df["Alterações"] = ""
+    df["Origem"] = "Legislativo - Parecer"
+    frames_leg.append(df)
 
-# Junta tudo
-        if frames_leg:
-            df_leg = pd.concat(frames_leg, ignore_index=True)
-        else:
-            df_leg = pd.DataFrame()
-        st.success(f"Legislativo OK ({len(df_leg)} registros)")
-    except Exception as e:
-        st.error(f"Erro Legislativo: {e}")
-        df_leg = pd.DataFrame()
+# ================= ADMINISTRATIVO (NOVO) =================
+try:
+    adm_proc = AdministrativeProcessor(pdf_leg)          # ← mesma PDF do Legislativo
+    df_adm = adm_proc.process_pdf()
+    if df_adm is not None and not df_adm.empty:
+        df_adm = df_adm.copy()
+        df_adm["Origem"] = "Legislativo - Administrativo"
+        # já vem com as colunas certas (Página, Coluna, Sanção, Sigla→Tipo, Número, Ano, Alterações)
+        df_adm = df_adm.rename(columns={"Sigla": "Tipo"})
+        frames_leg.append(df_adm)
+        st.success(f"Administrativo OK ({len(df_adm)} registros)")
+except Exception as e:
+    st.warning(f"Administrativo falhou (mas não quebra o resto): {e}")
 
     # ================= GOOGLE SHEETS =================
         # ================= GOOGLE SHEETS =================
