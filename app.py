@@ -1058,6 +1058,9 @@ if st.button("Processar"):
         if frames:
             df_final = pd.concat(frames, ignore_index=True)
 
+    # 🔴 COLOCA AQUI
+            df_final = df_final.fillna("")
+
             data_out = [df_final.columns.tolist()] + df_final.values.tolist()
             sheet.update("A1", data_out)
 
