@@ -1039,31 +1039,31 @@ if st.button("Processar"):
 
     # ================= GOOGLE SHEETS =================
     try:
-    sheet = conectar_gsheet()
+        sheet = conectar_gsheet()
 
-    frames = []
+        frames = []
 
-    if not df_exec.empty:
-        df_exec = df_exec.copy()
-        df_exec["Origem"] = "Executivo"
-        frames.append(df_exec)
+        if not df_exec.empty:
+            df_exec = df_exec.copy()
+            df_exec["Origem"] = "Executivo"
+            frames.append(df_exec)
 
-    if not df_leg.empty:
-        df_leg = df_leg.copy()
-        df_leg = df_leg.rename(columns={"Sigla": "Tipo"})
-        df_leg["Alterações"] = ""
-        df_leg["Origem"] = "Legislativo"
-        frames.append(df_leg)
+        if not df_leg.empty:
+            df_leg = df_leg.copy()
+            df_leg = df_leg.rename(columns={"Sigla": "Tipo"})
+            df_leg["Alterações"] = ""
+            df_leg["Origem"] = "Legislativo"
+            frames.append(df_leg)
 
-    if frames:
-        df_final = pd.concat(frames, ignore_index=True)
+        if frames:
+            df_final = pd.concat(frames, ignore_index=True)
 
-        data_out = [df_final.columns.tolist()] + df_final.values.tolist()
-        sheet.update("A1", data_out)
+            data_out = [df_final.columns.tolist()] + df_final.values.tolist()
+            sheet.update("A1", data_out)
 
-        st.success(f"Planilha atualizada 🚀 ({len(df_final)} registros)")
-    else:
-        st.warning("Nada para enviar")
+            st.success(f"Planilha atualizada 🚀 ({len(df_final)} registros)")
+        else:
+            st.warning("Nada para enviar")
 
 except Exception as e:
     st.error(f"Erro Google Sheets: {e}")
