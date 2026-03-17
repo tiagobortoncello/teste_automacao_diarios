@@ -1033,7 +1033,7 @@ if st.button("Processar"):
         leg_proc = LegislativeProcessor(pdf_leg)
         dados_leg = leg_proc.process_all()
 
-frames_leg = []
+        frames_leg = []
 
 # Normas
         if not dados_leg["Normas"].empty:
