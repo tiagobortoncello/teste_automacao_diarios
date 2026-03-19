@@ -278,8 +278,8 @@ def montar_link_data(texto_data: str, url: str) -> str:
     texto_data = str(texto_data).replace('"', '""')
     url = str(url).replace('"', '""')
 
-    # Para planilhas em pt-BR
-    return f'=HIPERLINK("{url}";"{texto_data}")'
+    # Para planilhas com locale que usa função/argumento em inglês
+    return f'=HYPERLINK("{url}","{texto_data}")'
 
 
 def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
