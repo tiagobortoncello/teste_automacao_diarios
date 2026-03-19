@@ -100,55 +100,9 @@ def num_to_col(n: int) -> str:
     return resultado
 
 
-def montar_link_data(texto_data: str, url: str) -> str:
-    if not url:
-        return texto_data
-
-    texto_data = str(texto_data).replace('"', '""')
-    url = str(url).replace('"', '""')
-
-    # inglês costuma ser mais estável via API
-    return f'=HYPERLINK("{url}";"{texto_data}")'
-
-
-def montar_hiperlink(url: str, texto_exibicao: str) -> str:
-    if not url or texto_exibicao in (None, ""):
-        return texto_exibicao if texto_exibicao is not None else ""
-
-    url = str(url).replace('"', '""')
-    texto_exibicao = str(texto_exibicao).replace('"', '""')
-
-    return f'=HYPERLINK("{url}";"{texto_exibicao}")'
-
-
-def montar_url_norma(tipo: str, numero: str, ano: str) -> str:
-    tipo = str(tipo or "").strip().upper()
-    numero = str(numero or "").strip()
-    ano = str(ano or "").strip()
-
-    if not tipo or not numero or not ano:
-        return ""
-
-    # alguns tipos funcionam melhor com /texto/
-    tipos_com_texto = {"DEC", "DNE"}
-
-    if tipo in tipos_com_texto:
-        return f"https://www.almg.gov.br/legislacao-mineira/texto/{tipo}/{numero}/{ano}/"
-
-    return f"https://www.almg.gov.br/legislacao-mineira/{tipo}/{numero}/{ano}/"
-
-def escrever_bloco(
-    ws,
-    linha_inicial: int,
-    linhas: list[list],
-    mesclar_coluna_a: bool = True,
-    colunas_link: list[int] | None = None
-):
+def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a: bool = True):
     if not linhas:
         return
-
-    if colunas_link is None:
-        colunas_link = []
 
     ncols = max(len(l) for l in linhas)
     linhas = [l + [""] * (ncols - len(l)) for l in linhas]
@@ -172,6 +126,7 @@ def escrever_bloco(
         value_input_option="USER_ENTERED"
     )
 
+    # fundo branco + fonte + alinhamento para todos os dados extraídos
     ws.format(
         faixa,
         {
@@ -190,6 +145,7 @@ def escrever_bloco(
         }
     )
 
+    # mescla a coluna A quando houver mais de uma linha
     if mesclar_coluna_a and len(linhas) > 1:
         faixa_merge = f"A{linha_inicial}:A{linha_fim}"
 
@@ -200,6 +156,7 @@ def escrever_bloco(
 
         ws.merge_cells(faixa_merge)
 
+        # reaplica a formatação na célula mesclada
         ws.format(
             faixa_merge,
             {
@@ -208,20 +165,10 @@ def escrever_bloco(
                 "textFormat": {
                     "fontFamily": "Inconsolata",
                     "fontSize": 10,
-                    "bold": True,
-                    "underline": True,
-                    "foregroundColor": {
-                        "red": 0.0,
-                        "green": 0.0,
-                        "blue": 1.0
-                    }
+                    "bold": True
                 }
             }
         )
-
-    # reaplica o visual de link nas colunas desejadas
-    if colunas_link:
-        formatar_links_visiveis(ws, linha_inicial, linha_fim, colunas_link)
 
 
 def escrever_celula(ws, celula: str, valor):
@@ -330,47 +277,8 @@ def montar_link_data(texto_data: str, url: str) -> str:
 
     texto_data = str(texto_data).replace('"', '""')
     url = str(url).replace('"', '""')
+    return f'=HIPERLINK("{url}";"{texto_data}")'
 
-    # inglês costuma ser mais estável via API
-    return f'=HYPERLINK("{url}";"{texto_data}")'
-
-
-def montar_hiperlink(url: str, texto_exibicao: str) -> str:
-    if not url or texto_exibicao in (None, ""):
-        return texto_exibicao if texto_exibicao is not None else ""
-
-    url = str(url).replace('"', '""')
-    texto_exibicao = str(texto_exibicao).replace('"', '""')
-
-    return f'=HYPERLINK("{url}";"{texto_exibicao}")'
-
-
-def montar_url_norma(tipo: str, numero: str, ano: str) -> str:
-    tipo = str(tipo or "").strip().upper()
-    numero = str(numero or "").strip()
-    ano = str(ano or "").strip()
-
-    if not tipo or not numero or not ano:
-        return ""
-
-    # alguns tipos funcionam melhor com /texto/
-    tipos_com_texto = {"DEC", "DNE"}
-
-    if tipo in tipos_com_texto:
-        return f"https://www.almg.gov.br/legislacao-mineira/texto/{tipo}/{numero}/{ano}/"
-
-    return f"https://www.almg.gov.br/legislacao-mineira/{tipo}/{numero}/{ano}/"
-
-
-def montar_url_proposicao(tipo: str, numero: str, ano: str) -> str:
-    tipo = str(tipo or "").strip()
-    numero = str(numero or "").strip()
-    ano = str(ano or "").strip()
-
-    if not tipo or not numero or not ano:
-        return ""
-
-    return f"https://www.almg.gov.br/projetos-de-lei/{tipo}/{numero}/{ano}"
 
 def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
     link_data = montar_link_data(data_str, url_diario)
@@ -382,22 +290,13 @@ def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") 
     linhas = []
 
     for i, (_, r) in enumerate(df.iterrows()):
-        tipo = r.get("Tipo", "")
-        numero = r.get("Número", "")
-        ano = r.get("Ano", "")
-
-        numero_link = montar_hiperlink(
-            montar_url_norma(tipo, numero, ano),
-            numero
-        )
-
         linhas.append([
             link_data if i == 0 else "",
             r.get("Página", ""),
             r.get("Coluna", ""),
             r.get("Sanção", ""),
-            tipo,
-            numero_link,
+            r.get("Tipo", ""),
+            r.get("Número", ""),
             "",
             "",
             "",
@@ -421,25 +320,17 @@ def montar_linhas_proposicoes(data_str: str, df: pd.DataFrame, url_diario: str =
     df = df.fillna("")
     linhas = []
     for i, (_, r) in enumerate(df.iterrows()):
-        tipo = r.get("Tipo", "")
-        numero = r.get("Número", "")
-        ano = r.get("Ano", "")
-
-        numero_link = montar_hiperlink(
-            montar_url_proposicao(tipo, numero, ano),
-            numero
-        )
-
         linhas.append([
             link_data if i == 0 else "",
-            tipo,
-            numero_link,
-            ano,
+            r.get("Tipo", ""),
+            r.get("Número", ""),
+            r.get("Ano", ""),
             "",
             "",
             r.get("Observação", r.get("Categoria", ""))
         ])
     return linhas
+
 
 def montar_linhas_requerimentos(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
     link_data = montar_link_data(data_str, url_diario)
@@ -450,20 +341,11 @@ def montar_linhas_requerimentos(data_str: str, df: pd.DataFrame, url_diario: str
     df = df.fillna("")
     linhas = []
     for i, (_, r) in enumerate(df.iterrows()):
-        tipo = r.get("Tipo", "")
-        numero = r.get("Número", "")
-        ano = r.get("Ano", "")
-
-        numero_link = montar_hiperlink(
-            montar_url_proposicao(tipo, numero, ano),
-            numero
-        )
-
         linhas.append([
             link_data if i == 0 else "",
-            tipo,
-            numero_link,
-            ano,
+            r.get("Tipo", ""),
+            r.get("Número", ""),
+            r.get("Ano", ""),
             "",
             "",
             r.get("Observação", r.get("Classificação", ""))
@@ -480,20 +362,11 @@ def montar_linhas_pareceres(data_str: str, df: pd.DataFrame, url_diario: str = "
     df = df.fillna("")
     linhas = []
     for i, (_, r) in enumerate(df.iterrows()):
-        tipo = r.get("Tipo", "")
-        numero = r.get("Número", "")
-        ano = r.get("Ano", "")
-
-        numero_link = montar_hiperlink(
-            montar_url_proposicao(tipo, numero, ano),
-            numero
-        )
-
         linhas.append([
             link_data if i == 0 else "",
-            tipo,
-            numero_link,
-            ano,
+            r.get("Tipo", ""),
+            r.get("Número", ""),
+            r.get("Ano", ""),
             r.get("Subtipo", ""),
             "",
             "",
@@ -517,56 +390,49 @@ def preencher_aba_modelo(
     escrever_bloco(
         ws,
         linha_pareceres,
-        montar_linhas_pareceres(data_str, df_pareceres, urls["legislativo"]),
-        colunas_link=[1, 3]
+        montar_linhas_pareceres(data_str, df_pareceres, urls["legislativo"])
     )
 
     linha_reqs = encontrar_linha(ws, "REQUERIMENTOS", 1) + 1
     escrever_bloco(
         ws,
         linha_reqs,
-        montar_linhas_requerimentos(data_str, df_reqs, urls["legislativo"]),
-        colunas_link=[1, 3]
+        montar_linhas_requerimentos(data_str, df_reqs, urls["legislativo"])
     )
 
     linha_props = encontrar_linha(ws, "PROPOSIÇÕES", 1) + 1
     escrever_bloco(
         ws,
         linha_props,
-        montar_linhas_proposicoes(data_str, df_props, urls["legislativo"]),
-        colunas_link=[1, 3]
+        montar_linhas_proposicoes(data_str, df_props, urls["legislativo"])
     )
 
     linha_leg = encontrar_linha(ws, "DIÁRIO DO LEGISLATIVO", 1) + 1
     escrever_bloco(
         ws,
         linha_leg,
-        montar_linhas_normas(data_str, df_leg_normas, urls["legislativo"]),
-        colunas_link=[1, 6]
+        montar_linhas_normas(data_str, df_leg_normas, urls["legislativo"])
     )
 
     linha_adm = encontrar_linha(ws, "DIÁRIO ADMINISTRATIVO", 1) + 1
     escrever_bloco(
         ws,
         linha_adm,
-        montar_linhas_normas(data_str, df_adm, urls["administrativo"]),
-        colunas_link=[1, 6]
+        montar_linhas_normas(data_str, df_adm, urls["administrativo"])
     )
 
     linha_dj = encontrar_linha(ws, "DIÁRIO DA JUSTIÇA", 1) + 1
     escrever_bloco(
         ws,
         linha_dj,
-        montar_linhas_normas(data_str, pd.DataFrame(), ""),
-        colunas_link=[1, 6]
+        montar_linhas_normas(data_str, pd.DataFrame(), "")
     )
 
     linha_exec = encontrar_linha(ws, "DIÁRIO DO EXECUTIVO", 1) + 1
     escrever_bloco(
         ws,
         linha_exec,
-        montar_linhas_normas(data_str, df_exec, urls["executivo_html"]),
-        colunas_link=[1, 6]
+        montar_linhas_normas(data_str, df_exec, urls["executivo_html"])
     )
 
     total_1 = encontrar_linha_safe(ws, "TOTAL", 1)
