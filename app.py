@@ -277,6 +277,8 @@ def montar_link_data(texto_data: str, url: str) -> str:
 
     texto_data = str(texto_data).replace('"', '""')
     url = str(url).replace('"', '""')
+
+    # Para planilhas em pt-BR
     return f'=HIPERLINK("{url}";"{texto_data}")'
 
 
