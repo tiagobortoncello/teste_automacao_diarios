@@ -55,8 +55,15 @@ def preparar_datas(data_str):
 # =========================
 def montar_urls(d):
     return {
-        "executivo_html": f"https://www.jornalminasgerais.mg.gov.br/edicao-do-dia?dados=%7B%22dataPublicacaoSelecionada%22:%22{d['iso_exec']}%22%7D",
+        "executivo_html": (
+            "https://www.jornalminasgerais.mg.gov.br/edicao-do-dia"
+            f"?dados=%7B%22dataPublicacaoSelecionada%22:%22{d['iso_exec']}%22%7D"
+        ),
         "legislativo": f"https://diariolegislativo.almg.gov.br/{d['yyyy']}/L{d['yyyymmdd']}.pdf",
+        "administrativo": (
+            "https://intra.almg.gov.br/export/sites/default/acontece/"
+            f"diario-administrativo/arquivos/{d['yyyy']}/{d['mm']}/L{d['yyyymmdd']}.pdf"
+        ),
     }
 
 
@@ -1085,6 +1092,22 @@ if st.button("Processar"):
     except Exception as e:
         st.error(f"Erro Legislativo: {e}")
         df_leg = pd.DataFrame()
+# ================= ADMINISTRATIVO =================
+try:
+    pdf_adm = baixar(urls["administrativo"])
+    adm_proc = AdministrativeProcessor(pdf_adm)
+    df_adm = adm_proc.process_pdf()
+
+    if df_adm is None:
+        df_adm = pd.DataFrame()
+    elif not df_adm.empty:
+        df_adm = df_adm.rename(columns={"Sigla": "Tipo"})
+
+    st.success(f"Administrativo OK ({len(df_adm)} registros)")
+except Exception as e:
+    st.error(f"Erro Administrativo: {e}")
+    df_adm = pd.DataFrame()
+    
 
     # ================= GOOGLE SHEETS =================
         # ================= GOOGLE SHEETS =================
