@@ -102,7 +102,7 @@ def num_to_col(n: int) -> str:
     return resultado
 
 
-def escrever_bloco(ws, linha_inicial: int, linhas: list[list]):
+def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a: bool = True):
     if not linhas:
         return
 
@@ -115,7 +115,7 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list]):
             [[""] * ncols for _ in range(extras)],
             row=linha_inicial + 1,
             value_input_option="USER_ENTERED",
-            inherit_from_before=True  # <- faz herdar o branco da linha de cima
+            inherit_from_before=True
         )
 
     col_fim = num_to_col(ncols)
@@ -127,7 +127,7 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list]):
         value_input_option="USER_ENTERED"
     )
 
-    # Garantia extra: pinta o fundo do bloco de dados de branco
+    # fundo branco no bloco de dados
     ws.format(
         f"A{linha_inicial}:{col_fim}{linha_fim}",
         {
@@ -138,6 +138,27 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list]):
             }
         }
     )
+
+    # mescla a coluna A quando houver mais de uma linha
+    if mesclar_coluna_a and len(linhas) > 1:
+        faixa_merge = f"A{linha_inicial}:A{linha_fim}"
+
+        # tenta desfazer merge anterior, se existir
+        try:
+            ws.unmerge_cells(faixa_merge)
+        except Exception:
+            pass
+
+        ws.merge_cells(faixa_merge)
+
+        # centraliza o conteúdo da célula mesclada
+        ws.format(
+            faixa_merge,
+            {
+                "horizontalAlignment": "CENTER",
+                "verticalAlignment": "MIDDLE"
+            }
+        )
 
 
 def escrever_celula(ws, celula: str, valor):
