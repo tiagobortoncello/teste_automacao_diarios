@@ -33,7 +33,7 @@ def conectar_gsheet():
     )
 
     client = gspread.authorize(creds)
-    return client.open_by_url(PLANILHA_URL)  # retorna a planilha inteira
+    return client.open_by_url(PLANILHA_URL)
 
 
 def nome_aba_data(data_str: str) -> str:
@@ -43,7 +43,6 @@ def nome_aba_data(data_str: str) -> str:
 def obter_ou_criar_aba_data(spreadsheet, data_str: str, nome_modelo: str = ABA_MODELO):
     nome_aba = nome_aba_data(data_str)
 
-    # apaga a aba se já existir
     try:
         ws_existente = spreadsheet.worksheet(nome_aba)
         spreadsheet.del_worksheet(ws_existente)
@@ -59,7 +58,6 @@ def obter_ou_criar_aba_data(spreadsheet, data_str: str, nome_modelo: str = ABA_M
         )
         return spreadsheet.worksheet(nome_aba)
     except Exception:
-        # fallback se o Google Sheets implicar com "/"
         nome_aba_alt = nome_aba.replace("/", "-")
         try:
             ws_existente = spreadsheet.worksheet(nome_aba_alt)
@@ -127,7 +125,6 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
         value_input_option="USER_ENTERED"
     )
 
-    # fundo branco no bloco de dados
     ws.format(
         f"A{linha_inicial}:{col_fim}{linha_fim}",
         {
@@ -139,11 +136,9 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
         }
     )
 
-    # mescla a coluna A quando houver mais de uma linha
     if mesclar_coluna_a and len(linhas) > 1:
         faixa_merge = f"A{linha_inicial}:A{linha_fim}"
 
-        # tenta desfazer merge anterior, se existir
         try:
             ws.unmerge_cells(faixa_merge)
         except Exception:
@@ -151,7 +146,6 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
 
         ws.merge_cells(faixa_merge)
 
-        # centraliza o conteúdo da célula mesclada
         ws.format(
             faixa_merge,
             {
@@ -261,44 +255,57 @@ def baixar_pdf_jornal_mg_por_link(url_pagina: str) -> bytes:
 # =========================
 # PREENCHIMENTO DO MODELO
 # =========================
-def montar_linhas_normas(data_str: str, df: pd.DataFrame) -> list[list]:
+def montar_link_data(texto_data: str, url: str) -> str:
+    if not url:
+        return texto_data
+
+    texto_data = str(texto_data).replace('"', '""')
+    url = str(url).replace('"', '""')
+    return f'=HIPERLINK("{url}";"{texto_data}")'
+
+
+def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
+    link_data = montar_link_data(data_str, url_diario)
+
     if df is None or df.empty:
-        return [[data_str, "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]]
+        return [[link_data, "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]]
 
     df = df.fillna("")
     linhas = []
 
     for i, (_, r) in enumerate(df.iterrows()):
         linhas.append([
-            data_str if i == 0 else "",
+            link_data if i == 0 else "",
             r.get("Página", ""),
             r.get("Coluna", ""),
             r.get("Sanção", ""),
             r.get("Tipo", ""),
             r.get("Número", ""),
-            "",  # execução implantação
-            "",  # revisão implantação
-            "",  # quantidade
-            r.get("Alterações", ""),  # norma alterada
-            "",  # vides
-            "",  # execução consolidação
-            "",  # revisão consolidação
-            "",  # execução indexação
-            "",  # revisão indexação
-            ""   # observação
+            "",
+            "",
+            "",
+            r.get("Alterações", ""),
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
         ])
     return linhas
 
 
-def montar_linhas_proposicoes(data_str: str, df: pd.DataFrame) -> list[list]:
+def montar_linhas_proposicoes(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
+    link_data = montar_link_data(data_str, url_diario)
+
     if df is None or df.empty:
-        return [[data_str, "", "", "", "", "", ""]]
+        return [[link_data, "", "", "", "", "", ""]]
 
     df = df.fillna("")
     linhas = []
     for i, (_, r) in enumerate(df.iterrows()):
         linhas.append([
-            data_str if i == 0 else "",
+            link_data if i == 0 else "",
             r.get("Tipo", ""),
             r.get("Número", ""),
             r.get("Ano", ""),
@@ -309,15 +316,17 @@ def montar_linhas_proposicoes(data_str: str, df: pd.DataFrame) -> list[list]:
     return linhas
 
 
-def montar_linhas_requerimentos(data_str: str, df: pd.DataFrame) -> list[list]:
+def montar_linhas_requerimentos(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
+    link_data = montar_link_data(data_str, url_diario)
+
     if df is None or df.empty:
-        return [[data_str, "", "", "", "", "", ""]]
+        return [[link_data, "", "", "", "", "", ""]]
 
     df = df.fillna("")
     linhas = []
     for i, (_, r) in enumerate(df.iterrows()):
         linhas.append([
-            data_str if i == 0 else "",
+            link_data if i == 0 else "",
             r.get("Tipo", ""),
             r.get("Número", ""),
             r.get("Ano", ""),
@@ -328,15 +337,17 @@ def montar_linhas_requerimentos(data_str: str, df: pd.DataFrame) -> list[list]:
     return linhas
 
 
-def montar_linhas_pareceres(data_str: str, df: pd.DataFrame) -> list[list]:
+def montar_linhas_pareceres(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
+    link_data = montar_link_data(data_str, url_diario)
+
     if df is None or df.empty:
-        return [[data_str, "", "", "", "", "", "", ""]]
+        return [[link_data, "", "", "", "", "", "", ""]]
 
     df = df.fillna("")
     linhas = []
     for i, (_, r) in enumerate(df.iterrows()):
         linhas.append([
-            data_str if i == 0 else "",
+            link_data if i == 0 else "",
             r.get("Tipo", ""),
             r.get("Número", ""),
             r.get("Ano", ""),
@@ -351,6 +362,7 @@ def montar_linhas_pareceres(data_str: str, df: pd.DataFrame) -> list[list]:
 def preencher_aba_modelo(
     ws,
     data_str: str,
+    urls: dict,
     df_exec: pd.DataFrame,
     df_adm: pd.DataFrame,
     df_leg_normas: pd.DataFrame,
@@ -358,29 +370,55 @@ def preencher_aba_modelo(
     df_reqs: pd.DataFrame,
     df_pareceres: pd.DataFrame
 ):
-    # escrever de baixo para cima
     linha_pareceres = encontrar_linha(ws, "PARECERES", 1) + 1
-    escrever_bloco(ws, linha_pareceres, montar_linhas_pareceres(data_str, df_pareceres))
+    escrever_bloco(
+        ws,
+        linha_pareceres,
+        montar_linhas_pareceres(data_str, df_pareceres, urls["legislativo"])
+    )
 
     linha_reqs = encontrar_linha(ws, "REQUERIMENTOS", 1) + 1
-    escrever_bloco(ws, linha_reqs, montar_linhas_requerimentos(data_str, df_reqs))
+    escrever_bloco(
+        ws,
+        linha_reqs,
+        montar_linhas_requerimentos(data_str, df_reqs, urls["legislativo"])
+    )
 
     linha_props = encontrar_linha(ws, "PROPOSIÇÕES", 1) + 1
-    escrever_bloco(ws, linha_props, montar_linhas_proposicoes(data_str, df_props))
+    escrever_bloco(
+        ws,
+        linha_props,
+        montar_linhas_proposicoes(data_str, df_props, urls["legislativo"])
+    )
 
     linha_leg = encontrar_linha(ws, "DIÁRIO DO LEGISLATIVO", 1) + 1
-    escrever_bloco(ws, linha_leg, montar_linhas_normas(data_str, df_leg_normas))
+    escrever_bloco(
+        ws,
+        linha_leg,
+        montar_linhas_normas(data_str, df_leg_normas, urls["legislativo"])
+    )
 
     linha_adm = encontrar_linha(ws, "DIÁRIO ADMINISTRATIVO", 1) + 1
-    escrever_bloco(ws, linha_adm, montar_linhas_normas(data_str, df_adm))
+    escrever_bloco(
+        ws,
+        linha_adm,
+        montar_linhas_normas(data_str, df_adm, urls["administrativo"])
+    )
 
     linha_dj = encontrar_linha(ws, "DIÁRIO DA JUSTIÇA", 1) + 1
-    escrever_bloco(ws, linha_dj, montar_linhas_normas(data_str, pd.DataFrame()))
+    escrever_bloco(
+        ws,
+        linha_dj,
+        montar_linhas_normas(data_str, pd.DataFrame(), "")
+    )
 
     linha_exec = encontrar_linha(ws, "DIÁRIO DO EXECUTIVO", 1) + 1
-    escrever_bloco(ws, linha_exec, montar_linhas_normas(data_str, df_exec))
+    escrever_bloco(
+        ws,
+        linha_exec,
+        montar_linhas_normas(data_str, df_exec, urls["executivo_html"])
+    )
 
-    # totais
     total_1 = encontrar_linha_safe(ws, "TOTAL", 1)
     total_2 = encontrar_linha_safe(ws, "TOTAL", 2)
     total_3 = encontrar_linha_safe(ws, "TOTAL", 3)
@@ -415,15 +453,6 @@ def preencher_aba_modelo(
 # =========================
 # SUAS CLASSES
 # =========================
-# MANTENHA EXATAMENTE AS 3 CLASSES QUE VOCÊ JÁ TEM:
-# - LegislativeProcessor
-# - AdministrativeProcessor
-# - ExecutiveProcessor
-#
-# Cole aqui, sem alterar a lógica.
-#
-# >>> INÍCIO DAS SUAS CLASSES <<<
-
 TIPO_MAP_NORMA = {
     "LEI": "LEI",
     "RESOLUÇÃO": "RAL",
@@ -1308,8 +1337,6 @@ class ExecutiveProcessor:
 
         return pd.DataFrame(dados) if dados else pd.DataFrame()
 
-# >>> FIM DAS SUAS CLASSES <<<
-
 
 # =========================
 # STREAMLIT
@@ -1424,6 +1451,7 @@ if st.button("Processar"):
         preencher_aba_modelo(
             ws=ws,
             data_str=d["display"],
+            urls=urls,
             df_exec=df_exec,
             df_adm=df_adm,
             df_leg_normas=df_leg_normas,
