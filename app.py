@@ -107,6 +107,9 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
     ncols = max(len(l) for l in linhas)
     linhas = [l + [""] * (ncols - len(l)) for l in linhas]
 
+    # guarda o valor original da célula A da 1ª linha
+    valor_anchor_a = linhas[0][0] if linhas and linhas[0] else ""
+
     extras = len(linhas) - 1
     if extras > 0:
         ws.insert_rows(
@@ -126,7 +129,6 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
         value_input_option="USER_ENTERED"
     )
 
-    # fundo branco + fonte + alinhamento para todos os dados extraídos
     ws.format(
         faixa,
         {
@@ -145,7 +147,6 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
         }
     )
 
-    # mescla a coluna A quando houver mais de uma linha
     if mesclar_coluna_a and len(linhas) > 1:
         faixa_merge = f"A{linha_inicial}:A{linha_fim}"
 
@@ -156,7 +157,6 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
 
         ws.merge_cells(faixa_merge)
 
-        # reaplica a formatação na célula mesclada
         ws.format(
             faixa_merge,
             {
@@ -168,6 +168,15 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
                     "bold": True
                 }
             }
+        )
+
+    # reaplica por último o valor da célula âncora
+    # se for fórmula HYPERLINK, ela volta a ser a célula clicável
+    if valor_anchor_a:
+        ws.update(
+            f"A{linha_inicial}",
+            [[valor_anchor_a]],
+            value_input_option="USER_ENTERED"
         )
 
 
