@@ -111,7 +111,12 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list]):
 
     extras = len(linhas) - 1
     if extras > 0:
-        ws.insert_rows([[""] * ncols for _ in range(extras)], row=linha_inicial + 1)
+        ws.insert_rows(
+            [[""] * ncols for _ in range(extras)],
+            row=linha_inicial + 1,
+            value_input_option="USER_ENTERED",
+            inherit_from_before=True  # <- faz herdar o branco da linha de cima
+        )
 
     col_fim = num_to_col(ncols)
     linha_fim = linha_inicial + len(linhas) - 1
@@ -120,6 +125,18 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list]):
         f"A{linha_inicial}:{col_fim}{linha_fim}",
         linhas,
         value_input_option="USER_ENTERED"
+    )
+
+    # Garantia extra: pinta o fundo do bloco de dados de branco
+    ws.format(
+        f"A{linha_inicial}:{col_fim}{linha_fim}",
+        {
+            "backgroundColor": {
+                "red": 1.0,
+                "green": 1.0,
+                "blue": 1.0
+            }
+        }
     )
 
 
