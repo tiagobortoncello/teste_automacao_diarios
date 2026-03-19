@@ -118,24 +118,34 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
 
     col_fim = num_to_col(ncols)
     linha_fim = linha_inicial + len(linhas) - 1
+    faixa = f"A{linha_inicial}:{col_fim}{linha_fim}"
 
     ws.update(
-        f"A{linha_inicial}:{col_fim}{linha_fim}",
+        faixa,
         linhas,
         value_input_option="USER_ENTERED"
     )
 
+    # fundo branco + fonte + alinhamento para todos os dados extraídos
     ws.format(
-        f"A{linha_inicial}:{col_fim}{linha_fim}",
+        faixa,
         {
             "backgroundColor": {
                 "red": 1.0,
                 "green": 1.0,
                 "blue": 1.0
+            },
+            "horizontalAlignment": "CENTER",
+            "verticalAlignment": "MIDDLE",
+            "textFormat": {
+                "fontFamily": "Inconsolata",
+                "fontSize": 10,
+                "bold": True
             }
         }
     )
 
+    # mescla a coluna A quando houver mais de uma linha
     if mesclar_coluna_a and len(linhas) > 1:
         faixa_merge = f"A{linha_inicial}:A{linha_fim}"
 
@@ -146,11 +156,17 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
 
         ws.merge_cells(faixa_merge)
 
+        # reaplica a formatação na célula mesclada
         ws.format(
             faixa_merge,
             {
                 "horizontalAlignment": "CENTER",
-                "verticalAlignment": "MIDDLE"
+                "verticalAlignment": "MIDDLE",
+                "textFormat": {
+                    "fontFamily": "Inconsolata",
+                    "fontSize": 10,
+                    "bold": True
+                }
             }
         )
 
