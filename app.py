@@ -236,7 +236,7 @@ def mesclar_linhas_intervalo(ws, linha_inicial: int, qtd_linhas: int, col_inicia
                 "range": faixa_linha,
                 "cell": {
                     "userEnteredFormat": {
-                        "horizontalAlignment": "CENTER",
+                        "horizontalAlignment": "LEFT",
                         "verticalAlignment": "MIDDLE",
                         "textFormat": {
                             "fontFamily": "Inconsolata",
