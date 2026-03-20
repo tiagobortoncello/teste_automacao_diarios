@@ -318,6 +318,33 @@ def montar_link_numero_norma(tipo: str, numero, sancao: str) -> str:
 
     return f'=HIPERLINK("{url_esc}";"{numero_txt_esc}")'
 
+def montar_link_alteracao_norma(alteracao) -> str:
+    texto = str(alteracao).strip()
+
+    if not texto:
+        return ""
+
+    partes = texto.split()
+
+    # Esperado: TIPO NUMERO ANO
+    # Ex.: "LEI 11990 1995" | "DEC 48589 2023"
+    if len(partes) < 3:
+        return texto
+
+    tipo_txt = partes[0].strip().upper()
+    numero_txt = partes[1].strip()
+    ano_txt = partes[2].strip()
+
+    if not tipo_txt or not numero_txt or not ano_txt:
+        return texto
+
+    url = f"https://www.almg.gov.br/legislacao-mineira/{tipo_txt}/{numero_txt}/{ano_txt}/"
+
+    texto_esc = texto.replace('"', '""')
+    url_esc = url.replace('"', '""')
+
+    return f'=HIPERLINK("{url_esc}";"{texto_esc}")'
+
 
 def montar_link_numero_proposicao(tipo: str, numero, ano) -> str:
     numero_txt = str(numero).strip()
@@ -350,6 +377,10 @@ def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") 
             sancao=r.get("Sanção", "")
         )
 
+        alteracao_link = montar_link_alteracao_norma(
+            r.get("Alterações", "")
+        )
+
         linhas.append([
             link_data if i == 0 else "",
             r.get("Página", ""),
@@ -360,7 +391,7 @@ def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") 
             "",
             "",
             "",
-            r.get("Alterações", ""),
+            alteracao_link,
             "",
             "",
             "",
