@@ -107,8 +107,12 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
     ncols = max(len(l) for l in linhas)
     linhas = [l + [""] * (ncols - len(l)) for l in linhas]
 
-    # guarda o valor original da célula A da 1ª linha
-    valor_anchor_a = linhas[0][0] if linhas and linhas[0] else ""
+    # guarda todas as fórmulas para reaplicar no final
+    formulas_para_reaplicar = []
+    for i, linha in enumerate(linhas, start=linha_inicial):
+        for j, valor in enumerate(linha, start=1):
+            if isinstance(valor, str) and valor.startswith("="):
+                formulas_para_reaplicar.append((f"{num_to_col(j)}{i}", valor))
 
     extras = len(linhas) - 1
     if extras > 0:
@@ -170,15 +174,13 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
             }
         )
 
-    # reaplica por último o valor da célula âncora
-    # se for fórmula HYPERLINK, ela volta a ser a célula clicável
-    if valor_anchor_a:
+    # reaplica por último TODAS as fórmulas do bloco
+    for celula, formula in formulas_para_reaplicar:
         ws.update(
-            f"A{linha_inicial}",
-            [[valor_anchor_a]],
+            celula,
+            [[formula]],
             value_input_option="USER_ENTERED"
         )
-
 
 def escrever_celula(ws, celula: str, valor):
     ws.update(celula, [[valor]], value_input_option="USER_ENTERED")
@@ -325,7 +327,7 @@ def montar_link_numero_proposicao(tipo: str, numero, ano) -> str:
     if not numero_txt or not tipo_txt or not ano_txt:
         return numero_txt
 
-    url = f"https://www.almg.gov.br/projetos-de-lei/{tipo_txt}/{numero_txt}/{ano_txt}"
+    url = f"https://www.almg.gov.br/projetos-de-lei/{tipo_txt}/{numero_txt}/{ano_txt}/"
     numero_txt_esc = numero_txt.replace('"', '""')
     url_esc = url.replace('"', '""')
 
