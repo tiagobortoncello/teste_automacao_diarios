@@ -1658,7 +1658,7 @@ with col1:
 
 with col2:
     mes_ref = st.session_state["mes_ref"]
-    st.markdown(f"### {MESES_PT[mes_ref.month - 1]} / {mes_ref.year}")
+    st.markdown(f"** {MESES_PT[mes_ref.month - 1]} / {mes_ref.year}")
 
 mes_atual = date.today().replace(day=1)
 
