@@ -107,12 +107,14 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
     ncols = max(len(l) for l in linhas)
     linhas = [l + [""] * (ncols - len(l)) for l in linhas]
 
-    # guarda todas as fórmulas para reaplicar no final
     formulas_para_reaplicar = []
     for i, linha in enumerate(linhas, start=linha_inicial):
         for j, valor in enumerate(linha, start=1):
             if isinstance(valor, str) and valor.startswith("="):
-                formulas_para_reaplicar.append((f"{num_to_col(j)}{i}", valor))
+                formulas_para_reaplicar.append({
+                    "range": f"{num_to_col(j)}{i}",
+                    "values": [[valor]]
+                })
 
     extras = len(linhas) - 1
     if extras > 0:
@@ -174,11 +176,9 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
             }
         )
 
-    # reaplica por último TODAS as fórmulas do bloco
-    for celula, formula in formulas_para_reaplicar:
-        ws.update(
-            celula,
-            [[formula]],
+    if formulas_para_reaplicar:
+        ws.batch_update(
+            formulas_para_reaplicar,
             value_input_option="USER_ENTERED"
         )
 
