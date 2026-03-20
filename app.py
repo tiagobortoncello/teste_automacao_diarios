@@ -283,12 +283,17 @@ def contar_alteracoes(df: pd.DataFrame) -> int:
 # =========================
 # DATA / UI OPERACIONAL
 # =========================
-def data_padrao_operacional() -> date:
-    hoje = date.today()
-    if hoje.weekday() == 0:  # segunda-feira
-        return hoje - timedelta(days=2)  # sábado
-    return hoje
+def ajustar_data_operacional(dt: date) -> date:
+    # weekday(): segunda=0 ... domingo=6
+    if dt.weekday() == 0:  # segunda-feira
+        return dt - timedelta(days=2)  # sábado anterior
+    if dt.weekday() == 6:  # domingo
+        return dt - timedelta(days=1)  # sábado anterior
+    return dt
 
+
+def data_padrao_operacional() -> date:
+    return ajustar_data_operacional(date.today())
 
 def preparar_datas(data_str):
     dt = datetime.strptime(data_str, "%d/%m/%Y")
@@ -1571,31 +1576,34 @@ except Exception as e:
 if "data_ref" not in st.session_state:
     st.session_state["data_ref"] = data_padrao_operacional()
 
+if "ajuste_msg" not in st.session_state:
+    st.session_state["ajuste_msg"] = ""
+
 st.caption("Selecione a data de trabalho")
-
-c1, c2, c3, c4 = st.columns(4)
-
-with c1:
-    if st.button("Padrão", use_container_width=True):
-        st.session_state["data_ref"] = data_padrao_operacional()
-
-with c2:
-    if st.button("Hoje", use_container_width=True):
-        st.session_state["data_ref"] = date.today()
-
-with c3:
-    if st.button("Ontem", use_container_width=True):
-        st.session_state["data_ref"] = date.today() - timedelta(days=1)
-
-with c4:
-    if st.button("Anteontem", use_container_width=True):
-        st.session_state["data_ref"] = date.today() - timedelta(days=2)
 
 st.date_input(
     "Data",
     key="data_ref",
-    format="DD/MM/YYYY"
+    format="DD/MM/YYYY",
+    max_value=date.today()
 )
+
+# Ajusta automaticamente domingo/segunda para sábado anterior
+data_selecionada = st.session_state["data_ref"]
+data_ajustada = ajustar_data_operacional(data_selecionada)
+
+if data_ajustada != data_selecionada:
+    st.session_state["data_ref"] = data_ajustada
+    st.session_state["ajuste_msg"] = (
+        f"Data ajustada automaticamente para "
+        f"{data_ajustada.strftime('%d/%m/%Y')}, "
+        f"pois domingo e segunda remetem ao sábado anterior."
+    )
+    st.rerun()
+
+if st.session_state["ajuste_msg"]:
+    st.info(st.session_state["ajuste_msg"])
+    st.session_state["ajuste_msg"] = ""
 
 data_obj = st.session_state["data_ref"]
 data = data_obj.strftime("%d/%m/%Y")
