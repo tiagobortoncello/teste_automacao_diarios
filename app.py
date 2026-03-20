@@ -1581,24 +1581,28 @@ if "ajuste_msg" not in st.session_state:
 
 st.caption("Selecione a data de trabalho")
 
-st.date_input(
+data_selecionada = st.date_input(
     "Data",
-    key="data_ref",
+    value=st.session_state["data_ref"],
     format="DD/MM/YYYY",
     max_value=date.today()
 )
 
 # Ajusta automaticamente domingo/segunda para sábado anterior
-data_selecionada = st.session_state["data_ref"]
 data_ajustada = ajustar_data_operacional(data_selecionada)
 
-if data_ajustada != data_selecionada:
+if data_ajustada != st.session_state["data_ref"]:
     st.session_state["data_ref"] = data_ajustada
-    st.session_state["ajuste_msg"] = (
-        f"Data ajustada automaticamente para "
-        f"{data_ajustada.strftime('%d/%m/%Y')}, "
-        f"pois domingo e segunda remetem ao sábado anterior."
-    )
+
+    if data_ajustada != data_selecionada:
+        st.session_state["ajuste_msg"] = (
+            f"Data ajustada automaticamente para "
+            f"{data_ajustada.strftime('%d/%m/%Y')}, "
+            f"pois domingo e segunda remetem ao sábado anterior."
+        )
+    else:
+        st.session_state["ajuste_msg"] = ""
+
     st.rerun()
 
 if st.session_state["ajuste_msg"]:
