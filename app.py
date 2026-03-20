@@ -6,8 +6,7 @@ import pypdf
 import io
 import requests
 import pdfplumber
-import calendar
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import gspread
 from google.oauth2.service_account import Credentials
 import json
@@ -282,88 +281,15 @@ def contar_alteracoes(df: pd.DataFrame) -> int:
     )
 
 # =========================
-# CALENDÁRIO MENSAL
+# DATA / UI OPERACIONAL
 # =========================
-MESES_PT = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-]
-
-
-def mes_anterior(dt: date) -> date:
-    if dt.month == 1:
-        return date(dt.year - 1, 12, 1)
-    return date(dt.year, dt.month - 1, 1)
-
-
-def proximo_mes(dt: date) -> date:
-    if dt.month == 12:
-        return date(dt.year + 1, 1, 1)
-    return date(dt.year, dt.month + 1, 1)
-
-
-def dias_existentes_no_mes(spreadsheet, ano: int, mes: int) -> set[int]:
-    nomes = listar_nomes_abas(spreadsheet)
-    dias = set()
-
-    ultimo_dia = calendar.monthrange(ano, mes)[1]
-    for dia in range(1, ultimo_dia + 1):
-        nome1 = f"{dia:02d}/{mes:02d}"
-        nome2 = f"{dia:02d}-{mes:02d}"
-        if nome1 in nomes or nome2 in nomes:
-            dias.add(dia)
-
-    return dias
-
-
-def renderizar_calendario_mensal(spreadsheet, mes_ref: date):
-    ano = mes_ref.year
-    mes = mes_ref.month
+def data_padrao_operacional() -> date:
     hoje = date.today()
+    if hoje.weekday() == 0:  # segunda-feira
+        return hoje - timedelta(days=2)  # sábado
+    return hoje
 
-    dias_existentes = dias_existentes_no_mes(spreadsheet, ano, mes)
 
-    st.caption("🟩 já existe | 🟥 falta criar")
-
-    cab = st.columns(7)
-    for col, nome in zip(cab, ["S", "T", "Q", "Q", "S", "S", "D"]):
-        col.markdown(f"**{nome}**")
-
-    semanas = calendar.monthcalendar(ano, mes)
-
-    for semana in semanas:
-        cols = st.columns(7)
-        for col_idx, dia in enumerate(semana):
-            with cols[col_idx]:
-                if dia == 0:
-                    st.markdown("&nbsp;", unsafe_allow_html=True)
-                    continue
-
-                data_dia = date(ano, mes, dia)
-
-                # não mostra dias futuros
-                if data_dia > hoje:
-                    st.markdown("&nbsp;", unsafe_allow_html=True)
-                    continue
-
-                data_txt = f"{dia:02d}/{mes:02d}/{ano}"
-                existe = dia in dias_existentes
-
-                rotulo = f"{'🟩' if existe else '🟥'} {dia:02d}"
-
-                clicou = st.button(
-                    rotulo,
-                    key=f"dia_{ano}_{mes}_{dia}",
-                    use_container_width=False,
-                    disabled=existe
-                )
-
-                if clicou:
-                    st.session_state["data_escolhida"] = data_txt
-
-# =========================
-# DATA
-# =========================
 def preparar_datas(data_str):
     dt = datetime.strptime(data_str, "%d/%m/%Y")
     return {
@@ -1633,6 +1559,7 @@ class ExecutiveProcessor:
 # =========================
 # STREAMLIT
 # =========================
+st.set_page_config(page_title="Diário MG → Automação", layout="centered")
 st.title("📄 Diário MG → Automação")
 
 try:
@@ -1641,53 +1568,53 @@ except Exception as e:
     st.error(f"Erro ao conectar na planilha do Google Sheets: {e}")
     st.stop()
 
-if "mes_ref" not in st.session_state:
-    hoje = date.today()
-    st.session_state["mes_ref"] = date(hoje.year, hoje.month, 1)
+if "data_ref" not in st.session_state:
+    st.session_state["data_ref"] = data_padrao_operacional()
 
-if "data_escolhida" not in st.session_state:
-    st.session_state["data_escolhida"] = ""
+st.caption("Selecione a data de trabalho")
 
-col1, col2, col3 = st.columns([1, 2, 1])
+c1, c2, c3, c4 = st.columns(4)
 
-with col1:
-    if st.button("⬅️ Mês anterior"):
-        st.session_state["mes_ref"] = mes_anterior(st.session_state["mes_ref"])
-        st.session_state["data_escolhida"] = ""
-        st.rerun()
+with c1:
+    if st.button("Padrão", use_container_width=True):
+        st.session_state["data_ref"] = data_padrao_operacional()
 
-with col2:
-    mes_ref = st.session_state["mes_ref"]
-    st.markdown(f"** {MESES_PT[mes_ref.month - 1]} / {mes_ref.year}")
+with c2:
+    if st.button("Hoje", use_container_width=True):
+        st.session_state["data_ref"] = date.today()
 
-mes_atual = date.today().replace(day=1)
+with c3:
+    if st.button("Ontem", use_container_width=True):
+        st.session_state["data_ref"] = date.today() - timedelta(days=1)
 
-with col3:
-    bloquear_proximo = st.session_state["mes_ref"] >= mes_atual
-    if st.button("➡️ Próximo mês", disabled=bloquear_proximo):
-        st.session_state["mes_ref"] = proximo_mes(st.session_state["mes_ref"])
-        st.session_state["data_escolhida"] = ""
-        st.rerun()
+with c4:
+    if st.button("Anteontem", use_container_width=True):
+        st.session_state["data_ref"] = date.today() - timedelta(days=2)
 
-renderizar_calendario_mensal(spreadsheet, st.session_state["mes_ref"])
+st.date_input(
+    "Data",
+    key="data_ref",
+    format="DD/MM/YYYY"
+)
 
-data = st.session_state["data_escolhida"]
+data_obj = st.session_state["data_ref"]
+data = data_obj.strftime("%d/%m/%Y")
 
-if data:
-    st.info(f"Data selecionada: **{data}**")
+pode_processar = True
 
+if data_obj > date.today():
+    st.error("Data futura não é permitida.")
+    pode_processar = False
+else:
     existe, nome_encontrado = aba_existe(spreadsheet, data)
-    pode_processar = not existe
 
     if existe:
-        st.error(f"A aba '{nome_encontrado}' já existe. O processamento está bloqueado.")
+        st.caption(f"🟩 {data} — aba '{nome_encontrado}' já existe")
+        pode_processar = False
     else:
-        st.success("Essa data ainda não foi criada.")
-else:
-    st.warning("Selecione um dia vermelho no calendário.")
-    pode_processar = False
+        st.caption(f"🟥 {data} — ainda não criada")
 
-if st.button("Processar", disabled=not pode_processar):
+if st.button("Processar", disabled=not pode_processar, use_container_width=True):
     try:
         d = preparar_datas(data)
     except ValueError:
@@ -1802,8 +1729,6 @@ if st.button("Processar", disabled=not pode_processar):
         )
 
         st.success(f"Aba '{ws.title}' criada e preenchida com sucesso 🚀")
-
-        st.session_state["data_escolhida"] = ""
         st.rerun()
 
     except Exception as e:
