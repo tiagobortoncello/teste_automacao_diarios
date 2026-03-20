@@ -280,6 +280,9 @@ def baixar_pdf_jornal_mg_por_link(url_pagina: str) -> bytes:
 # =========================
 # PREENCHIMENTO DO MODELO
 # =========================
+# =========================
+# PREENCHIMENTO DO MODELO
+# =========================
 def montar_link_data(texto_data: str, url: str) -> str:
     if not url:
         return texto_data
@@ -289,6 +292,44 @@ def montar_link_data(texto_data: str, url: str) -> str:
 
     # Para planilhas em pt-BR
     return f'=HIPERLINK("{url}";"{texto_data}")'
+
+
+def montar_link_numero_norma(tipo: str, numero, sancao: str) -> str:
+    numero_txt = str(numero).strip()
+    tipo_txt = str(tipo).strip().upper()
+    sancao_txt = str(sancao).strip()
+
+    if not numero_txt or not tipo_txt:
+        return numero_txt
+
+    ano = ""
+    m = re.search(r"(\d{4})$", sancao_txt)
+    if m:
+        ano = m.group(1)
+
+    if not ano:
+        return numero_txt
+
+    url = f"https://www.almg.gov.br/legislacao-mineira/{tipo_txt}/{numero_txt}/{ano}/"
+    numero_txt_esc = numero_txt.replace('"', '""')
+    url_esc = url.replace('"', '""')
+
+    return f'=HIPERLINK("{url_esc}";"{numero_txt_esc}")'
+
+
+def montar_link_numero_proposicao(tipo: str, numero, ano) -> str:
+    numero_txt = str(numero).strip()
+    tipo_txt = str(tipo).strip().upper()
+    ano_txt = str(ano).strip()
+
+    if not numero_txt or not tipo_txt or not ano_txt:
+        return numero_txt
+
+    url = f"https://www.almg.gov.br/projetos-de-lei/{tipo_txt}/{numero_txt}/{ano_txt}"
+    numero_txt_esc = numero_txt.replace('"', '""')
+    url_esc = url.replace('"', '""')
+
+    return f'=HIPERLINK("{url_esc}";"{numero_txt_esc}")'
 
 
 def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
@@ -301,13 +342,19 @@ def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") 
     linhas = []
 
     for i, (_, r) in enumerate(df.iterrows()):
+        numero_link = montar_link_numero_norma(
+            tipo=r.get("Tipo", ""),
+            numero=r.get("Número", ""),
+            sancao=r.get("Sanção", "")
+        )
+
         linhas.append([
             link_data if i == 0 else "",
             r.get("Página", ""),
             r.get("Coluna", ""),
             r.get("Sanção", ""),
             r.get("Tipo", ""),
-            r.get("Número", ""),
+            numero_link,
             "",
             "",
             "",
@@ -321,7 +368,6 @@ def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") 
         ])
     return linhas
 
-
 def montar_linhas_proposicoes(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
     link_data = montar_link_data(data_str, url_diario)
 
@@ -331,10 +377,16 @@ def montar_linhas_proposicoes(data_str: str, df: pd.DataFrame, url_diario: str =
     df = df.fillna("")
     linhas = []
     for i, (_, r) in enumerate(df.iterrows()):
+        numero_link = montar_link_numero_proposicao(
+            tipo=r.get("Tipo", ""),
+            numero=r.get("Número", ""),
+            ano=r.get("Ano", "")
+        )
+
         linhas.append([
             link_data if i == 0 else "",
             r.get("Tipo", ""),
-            r.get("Número", ""),
+            numero_link,
             r.get("Ano", ""),
             "",
             "",
@@ -352,10 +404,16 @@ def montar_linhas_requerimentos(data_str: str, df: pd.DataFrame, url_diario: str
     df = df.fillna("")
     linhas = []
     for i, (_, r) in enumerate(df.iterrows()):
+        numero_link = montar_link_numero_proposicao(
+            tipo=r.get("Tipo", ""),
+            numero=r.get("Número", ""),
+            ano=r.get("Ano", "")
+        )
+
         linhas.append([
             link_data if i == 0 else "",
             r.get("Tipo", ""),
-            r.get("Número", ""),
+            numero_link,
             r.get("Ano", ""),
             "",
             "",
@@ -373,10 +431,16 @@ def montar_linhas_pareceres(data_str: str, df: pd.DataFrame, url_diario: str = "
     df = df.fillna("")
     linhas = []
     for i, (_, r) in enumerate(df.iterrows()):
+        numero_link = montar_link_numero_proposicao(
+            tipo=r.get("Tipo", ""),
+            numero=r.get("Número", ""),
+            ano=r.get("Ano", "")
+        )
+
         linhas.append([
             link_data if i == 0 else "",
             r.get("Tipo", ""),
-            r.get("Número", ""),
+            numero_link,
             r.get("Ano", ""),
             r.get("Subtipo", ""),
             "",
