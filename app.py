@@ -1500,6 +1500,10 @@ class ExecutiveProcessor:
                             if ano_match:
                                 ano_alt = ano_match.group(1)
 
+                        # ajuste pontual para o decreto que às vezes vem sem ano
+                        if tipo_alt == "DEC" and num_alt == "48589" and not ano_alt:
+                            ano_alt = "2023"
+
                         chave_alt = f"{tipo_alt} {num_alt}"
                         if ano_alt:
                             chave_alt += f" {ano_alt}"
