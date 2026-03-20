@@ -334,53 +334,64 @@ def baixar(url):
 # EXECUTIVO
 # =========================
 def baixar_pdf_jornal_mg_por_link(url_pagina: str) -> bytes:
-    try:
-        match = re.search(r'dados=([^&]+)', url_pagina)
-        if not match:
-            raise Exception("Parâmetro dados não encontrado")
+    ultimo_erro = None
 
-        dados_codificados = match.group(1)
-        json_str = requests.utils.unquote(dados_codificados)
-        dados = json.loads(json_str)
+    for tentativa in range(3):
+        try:
+            match = re.search(r'dados=([^&]+)', url_pagina)
+            if not match:
+                raise Exception("Parâmetro dados não encontrado")
 
-        data_iso = dados["dataPublicacaoSelecionada"]
-        data = data_iso.split("T")[0]
+            dados_codificados = match.group(1)
+            json_str = requests.utils.unquote(dados_codificados)
+            dados = json.loads(json_str)
 
-        api_url = (
-            "https://www.jornalminasgerais.mg.gov.br/api/v1/Jornal/"
-            f"ObterEdicaoPorDataPublicacao?dataPublicacao={data}"
-        )
+            data_iso = dados["dataPublicacaoSelecionada"]
+            data = data_iso.split("T")[0]
 
-        session = requests.Session()
+            api_url = (
+                "https://www.jornalminasgerais.mg.gov.br/api/v1/Jornal/"
+                f"ObterEdicaoPorDataPublicacao?dataPublicacao={data}"
+            )
 
-        headers_pagina = {
-            "User-Agent": "Mozilla/5.0",
-            "Referer": "https://www.jornalminasgerais.mg.gov.br/",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        }
+            session = requests.Session()
 
-        headers_api = {
-            "User-Agent": "Mozilla/5.0",
-            "Referer": url_pagina,
-            "Accept": "application/json, text/plain, */*"
-        }
+            headers_pagina = {
+                "User-Agent": "Mozilla/5.0",
+                "Referer": "https://www.jornalminasgerais.mg.gov.br/",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            }
 
-        # 1) Abre primeiro a interface normal para criar sessão/contexto
-        resp_pagina = session.get(url_pagina, headers=headers_pagina, timeout=60)
-        resp_pagina.raise_for_status()
+            headers_api = {
+                "User-Agent": "Mozilla/5.0",
+                "Referer": url_pagina,
+                "Accept": "application/json, text/plain, */*"
+            }
 
-        # 2) Depois chama a API com a mesma sessão
-        resp_api = session.get(api_url, headers=headers_api, timeout=60)
-        resp_api.raise_for_status()
+            # 1) abre a interface normal primeiro
+            resp_pagina = session.get(url_pagina, headers=headers_pagina, timeout=60)
+            resp_pagina.raise_for_status()
 
-        dados_api = resp_api.json()
-        base64_pdf = dados_api["dados"]["arquivoCadernoPrincipal"]["arquivo"]
-        pdf_bytes = base64.b64decode(base64_pdf)
+            # debug opcional
+            st.write("Cookies após abrir página:", session.cookies.get_dict())
 
-        return pdf_bytes
+            # 2) chama a API com a mesma sessão
+            resp_api = session.get(api_url, headers=headers_api, timeout=60)
 
-    except Exception as e:
-        raise Exception(f"Erro ao obter PDF do Executivo: {e}")
+            st.write("Status API Executivo:", resp_api.status_code)
+
+            resp_api.raise_for_status()
+
+            dados_api = resp_api.json()
+            base64_pdf = dados_api["dados"]["arquivoCadernoPrincipal"]["arquivo"]
+            return base64.b64decode(base64_pdf)
+
+        except Exception as e:
+            ultimo_erro = e
+            if tentativa < 2:
+                time.sleep(2 * (tentativa + 1))
+
+    raise Exception(f"Erro ao obter PDF do Executivo após 3 tentativas: {ultimo_erro}")
 
 # =========================
 # PREENCHIMENTO DO MODELO
