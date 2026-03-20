@@ -334,39 +334,54 @@ def baixar(url):
 # EXECUTIVO
 # =========================
 def baixar_pdf_jornal_mg_por_link(url_pagina: str) -> bytes:
-    try:
-        match = re.search(r'dados=([^&]+)', url_pagina)
-        if not match:
-            raise Exception("Parâmetro dados não encontrado")
+    match = re.search(r'dados=([^&]+)', url_pagina)
+    if not match:
+        raise Exception("Parâmetro dados não encontrado")
 
-        dados_codificados = match.group(1)
-        json_str = requests.utils.unquote(dados_codificados)
-        dados = json.loads(json_str)
+    dados_codificados = match.group(1)
+    json_str = requests.utils.unquote(dados_codificados)
+    dados = json.loads(json_str)
 
-        data_iso = dados["dataPublicacaoSelecionada"]
-        data = data_iso.split("T")[0]
+    data_iso = dados["dataPublicacaoSelecionada"]
+    data = data_iso.split("T")[0]
 
-        api_url = (
-            "https://www.jornalminasgerais.mg.gov.br/api/v1/Jornal/"
-            f"ObterEdicaoPorDataPublicacao?dataPublicacao={data}"
-        )
+    api_url = (
+        "https://www.jornalminasgerais.mg.gov.br/api/v1/Jornal/"
+        f"ObterEdicaoPorDataPublicacao?dataPublicacao={data}"
+    )
 
-        headers = {
-            "User-Agent": "Mozilla/5.0",
+    headers_base = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json, text/plain, */*"
+    }
+
+    session = requests.Session()
+
+    # 1) visita a interface normal primeiro
+    page_resp = session.get(
+        url_pagina,
+        headers={
+            **headers_base,
             "Referer": "https://www.jornalminasgerais.mg.gov.br/"
-        }
+        },
+        timeout=60
+    )
+    page_resp.raise_for_status()
 
-        r = requests.get(api_url, headers=headers, timeout=60)
-        r.raise_for_status()
+    # 2) chama a API com a mesma sessão
+    api_resp = session.get(
+        api_url,
+        headers={
+            **headers_base,
+            "Referer": url_pagina
+        },
+        timeout=60
+    )
+    api_resp.raise_for_status()
 
-        dados_api = r.json()
-        base64_pdf = dados_api["dados"]["arquivoCadernoPrincipal"]["arquivo"]
-        pdf_bytes = base64.b64decode(base64_pdf)
-
-        return pdf_bytes
-
-    except Exception as e:
-        raise Exception(f"Erro ao obter PDF do Executivo: {e}")
+    dados_api = api_resp.json()
+    base64_pdf = dados_api["dados"]["arquivoCadernoPrincipal"]["arquivo"]
+    return base64.b64decode(base64_pdf)
 
 # =========================
 # PREENCHIMENTO DO MODELO
