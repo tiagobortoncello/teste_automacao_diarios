@@ -6,7 +6,8 @@ import pypdf
 import io
 import requests
 import pdfplumber
-from datetime import datetime
+import calendar
+from datetime import datetime, date
 import gspread
 from google.oauth2.service_account import Credentials
 import json
@@ -40,15 +41,32 @@ def nome_aba_data(data_str: str) -> str:
     return datetime.strptime(data_str, "%d/%m/%Y").strftime("%d/%m")
 
 
-def obter_ou_criar_aba_data(spreadsheet, data_str: str, nome_modelo: str = ABA_MODELO):
+def listar_nomes_abas(spreadsheet) -> set:
+    return {ws.title.strip() for ws in spreadsheet.worksheets()}
+
+
+def aba_existe(spreadsheet, data_str: str) -> tuple[bool, str]:
     nome_aba = nome_aba_data(data_str)
+    nome_aba_alt = nome_aba.replace("/", "-")
 
-    try:
-        ws_existente = spreadsheet.worksheet(nome_aba)
-        spreadsheet.del_worksheet(ws_existente)
-    except gspread.WorksheetNotFound:
-        pass
+    nomes = listar_nomes_abas(spreadsheet)
 
+    if nome_aba in nomes:
+        return True, nome_aba
+    if nome_aba_alt in nomes:
+        return True, nome_aba_alt
+
+    return False, nome_aba
+
+
+def obter_ou_criar_aba_data(spreadsheet, data_str: str, nome_modelo: str = ABA_MODELO):
+    existe, nome_encontrado = aba_existe(spreadsheet, data_str)
+    if existe:
+        raise ValueError(
+            f"A aba '{nome_encontrado}' já existe. Operação bloqueada para evitar sobrescrita."
+        )
+
+    nome_aba = nome_aba_data(data_str)
     modelo = spreadsheet.worksheet(nome_modelo)
 
     try:
@@ -59,12 +77,6 @@ def obter_ou_criar_aba_data(spreadsheet, data_str: str, nome_modelo: str = ABA_M
         return spreadsheet.worksheet(nome_aba)
     except Exception:
         nome_aba_alt = nome_aba.replace("/", "-")
-        try:
-            ws_existente = spreadsheet.worksheet(nome_aba_alt)
-            spreadsheet.del_worksheet(ws_existente)
-        except gspread.WorksheetNotFound:
-            pass
-
         spreadsheet.duplicate_sheet(
             source_sheet_id=modelo.id,
             new_sheet_name=nome_aba_alt
@@ -182,6 +194,7 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
             value_input_option="USER_ENTERED"
         )
 
+
 def mesclar_linhas_intervalo(ws, linha_inicial: int, qtd_linhas: int, col_inicial: int, col_final: int):
     if qtd_linhas <= 0:
         return
@@ -189,7 +202,7 @@ def mesclar_linhas_intervalo(ws, linha_inicial: int, qtd_linhas: int, col_inicia
     start_row = linha_inicial - 1
     end_row = linha_inicial + qtd_linhas - 1
     start_col = col_inicial - 1
-    end_col = col_final  # final inclusivo na entrada / exclusivo na API
+    end_col = col_final
 
     faixa_total = {
         "sheetId": ws.id,
@@ -199,7 +212,6 @@ def mesclar_linhas_intervalo(ws, linha_inicial: int, qtd_linhas: int, col_inicia
         "endColumnIndex": end_col
     }
 
-    # tenta desfazer mesclas antigas do intervalo inteiro
     try:
         ws.spreadsheet.batch_update({
             "requests": [
@@ -252,6 +264,7 @@ def mesclar_linhas_intervalo(ws, linha_inicial: int, qtd_linhas: int, col_inicia
     if requests:
         ws.spreadsheet.batch_update({"requests": requests})
 
+
 def escrever_celula(ws, celula: str, valor):
     ws.update(celula, [[valor]], value_input_option="USER_ENTERED")
 
@@ -268,6 +281,74 @@ def contar_alteracoes(df: pd.DataFrame) -> int:
         .sum()
     )
 
+# =========================
+# CALENDÁRIO MENSAL
+# =========================
+MESES_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+]
+
+
+def mes_anterior(dt: date) -> date:
+    if dt.month == 1:
+        return date(dt.year - 1, 12, 1)
+    return date(dt.year, dt.month - 1, 1)
+
+
+def proximo_mes(dt: date) -> date:
+    if dt.month == 12:
+        return date(dt.year + 1, 1, 1)
+    return date(dt.year, dt.month + 1, 1)
+
+
+def dias_existentes_no_mes(spreadsheet, ano: int, mes: int) -> set[int]:
+    nomes = listar_nomes_abas(spreadsheet)
+    dias = set()
+
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    for dia in range(1, ultimo_dia + 1):
+        nome1 = f"{dia:02d}/{mes:02d}"
+        nome2 = f"{dia:02d}-{mes:02d}"
+        if nome1 in nomes or nome2 in nomes:
+            dias.add(dia)
+
+    return dias
+
+
+def renderizar_calendario_mensal(spreadsheet, mes_ref: date):
+    ano = mes_ref.year
+    mes = mes_ref.month
+    dias_existentes = dias_existentes_no_mes(spreadsheet, ano, mes)
+
+    st.markdown("**Legenda:** 🟩 já existe | 🟥 falta criar")
+
+    cab = st.columns(7)
+    for col, nome in zip(cab, ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]):
+        col.markdown(f"**{nome}**")
+
+    semanas = calendar.monthcalendar(ano, mes)
+
+    for semana in semanas:
+        cols = st.columns(7)
+        for col_idx, dia in enumerate(semana):
+            with cols[col_idx]:
+                if dia == 0:
+                    st.markdown("&nbsp;", unsafe_allow_html=True)
+                else:
+                    data_txt = f"{dia:02d}/{mes:02d}/{ano}"
+                    existe = dia in dias_existentes
+                    rotulo = f"{'🟩' if existe else '🟥'} {dia:02d}"
+
+                    clicou = st.button(
+                        rotulo,
+                        key=f"dia_{ano}_{mes}_{dia}",
+                        use_container_width=True,
+                        disabled=existe
+                    )
+
+                    if clicou:
+                        st.session_state["data_escolhida"] = data_txt
 
 # =========================
 # DATA
@@ -282,7 +363,6 @@ def preparar_datas(data_str):
         "iso_exec": dt.strftime("%Y-%m-%dT06:00:00.000Z"),
         "display": dt.strftime("%d/%m/%Y"),
     }
-
 
 # =========================
 # URLS
@@ -300,7 +380,6 @@ def montar_urls(d):
         ),
     }
 
-
 # =========================
 # DOWNLOAD
 # =========================
@@ -308,7 +387,6 @@ def baixar(url):
     r = requests.get(url, timeout=60)
     r.raise_for_status()
     return r.content
-
 
 # =========================
 # EXECUTIVO
@@ -348,10 +426,6 @@ def baixar_pdf_jornal_mg_por_link(url_pagina: str) -> bytes:
     except Exception as e:
         raise Exception(f"Erro ao obter PDF do Executivo: {e}")
 
-
-# =========================
-# PREENCHIMENTO DO MODELO
-# =========================
 # =========================
 # PREENCHIMENTO DO MODELO
 # =========================
@@ -362,7 +436,6 @@ def montar_link_data(texto_data: str, url: str) -> str:
     texto_data = str(texto_data).replace('"', '""')
     url = str(url).replace('"', '""')
 
-    # Para planilhas em pt-BR
     return f'=HIPERLINK("{url}";"{texto_data}")'
 
 
@@ -388,6 +461,7 @@ def montar_link_numero_norma(tipo: str, numero, sancao: str) -> str:
 
     return f'=HIPERLINK("{url_esc}";"{numero_txt_esc}")'
 
+
 def montar_link_alteracao_norma(alteracao) -> str:
     texto = str(alteracao).strip()
 
@@ -396,8 +470,6 @@ def montar_link_alteracao_norma(alteracao) -> str:
 
     partes = texto.split()
 
-    # Esperado: TIPO NUMERO ANO
-    # Ex.: "LEI 11990 1995" | "DEC 48589 2023"
     if len(partes) < 3:
         return texto
 
@@ -470,6 +542,7 @@ def montar_linhas_normas(data_str: str, df: pd.DataFrame, url_diario: str = "") 
             ""
         ])
     return linhas
+
 
 def montar_linhas_proposicoes(data_str: str, df: pd.DataFrame, url_diario: str = "") -> list[list]:
     link_data = montar_link_data(data_str, url_diario)
@@ -567,17 +640,17 @@ def preencher_aba_modelo(
     linha_pareceres = encontrar_linha(ws, "PARECERES", 1) + 1
     linhas_pareceres = montar_linhas_pareceres(data_str, df_pareceres, urls["legislativo"])
     escrever_bloco(ws, linha_pareceres, linhas_pareceres)
-    mesclar_linhas_intervalo(ws, linha_pareceres, len(linhas_pareceres), 8, 15)  # H:O
+    mesclar_linhas_intervalo(ws, linha_pareceres, len(linhas_pareceres), 8, 15)
 
     linha_reqs = encontrar_linha(ws, "REQUERIMENTOS", 1) + 1
     linhas_reqs = montar_linhas_requerimentos(data_str, df_reqs, urls["legislativo"])
     escrever_bloco(ws, linha_reqs, linhas_reqs)
-    mesclar_linhas_intervalo(ws, linha_reqs, len(linhas_reqs), 7, 15)  # G:O
+    mesclar_linhas_intervalo(ws, linha_reqs, len(linhas_reqs), 7, 15)
 
     linha_props = encontrar_linha(ws, "PROPOSIÇÕES", 1) + 1
     linhas_props = montar_linhas_proposicoes(data_str, df_props, urls["legislativo"])
     escrever_bloco(ws, linha_props, linhas_props)
-    mesclar_linhas_intervalo(ws, linha_props, len(linhas_props), 7, 15)  # G:O
+    mesclar_linhas_intervalo(ws, linha_props, len(linhas_props), 7, 15)
 
     linha_leg = encontrar_linha(ws, "DIÁRIO DO LEGISLATIVO", 1) + 1
     escrever_bloco(
@@ -637,7 +710,6 @@ def preencher_aba_modelo(
     if total_5:
         escrever_celula(ws, f"C{total_5}", 0)
 
-
 # =========================
 # SUAS CLASSES
 # =========================
@@ -677,6 +749,7 @@ meses = {
     "ABRIL": "04", "MAIO": "05", "JUNHO": "06", "JULHO": "07",
     "AGOSTO": "08", "SETEMBRO": "09", "OUTUBRO": "10", "NOVEMBRO": "11", "DEZEMBRO": "12"
 }
+
 
 def classify_req(segment: str) -> str:
     segment_lower = segment.lower()
@@ -1085,6 +1158,7 @@ class LegislativeProcessor:
             "Requerimentos": df_requerimentos,
             "Pareceres": df_pareceres
         }
+
 # =========================
 # CLASS AdministrativeProcessor
 # =========================
@@ -1349,7 +1423,6 @@ class AdministrativeProcessor:
             columns=["Página", "Coluna", "Sanção", "Sigla", "Número", "Ano", "Alterações"]
         )
 
-
 # =========================
 # CLASS ExecutiveProcessor
 # =========================
@@ -1518,7 +1591,6 @@ class ExecutiveProcessor:
                             if ano_match:
                                 ano_alt = ano_match.group(1)
 
-                        # ajuste pontual para o decreto que às vezes vem sem ano
                         if tipo_alt == "DEC" and num_alt == "48589" and not ano_alt:
                             ano_alt = "2023"
 
@@ -1547,15 +1619,61 @@ class ExecutiveProcessor:
 
         return pd.DataFrame(dados) if dados else pd.DataFrame()
 
-
 # =========================
 # STREAMLIT
 # =========================
 st.title("📄 Diário MG → Automação")
 
-data = st.text_input("Data (DD/MM/AAAA)", datetime.today().strftime("%d/%m/%Y"))
+try:
+    spreadsheet = conectar_gsheet()
+except Exception as e:
+    st.error(f"Erro ao conectar na planilha do Google Sheets: {e}")
+    st.stop()
 
-if st.button("Processar"):
+if "mes_ref" not in st.session_state:
+    hoje = date.today()
+    st.session_state["mes_ref"] = date(hoje.year, hoje.month, 1)
+
+if "data_escolhida" not in st.session_state:
+    st.session_state["data_escolhida"] = ""
+
+col1, col2, col3 = st.columns([1, 2, 1])
+
+with col1:
+    if st.button("⬅️ Mês anterior"):
+        st.session_state["mes_ref"] = mes_anterior(st.session_state["mes_ref"])
+        st.session_state["data_escolhida"] = ""
+        st.rerun()
+
+with col2:
+    mes_ref = st.session_state["mes_ref"]
+    st.markdown(f"### {MESES_PT[mes_ref.month - 1]} / {mes_ref.year}")
+
+with col3:
+    if st.button("➡️ Próximo mês"):
+        st.session_state["mes_ref"] = proximo_mes(st.session_state["mes_ref"])
+        st.session_state["data_escolhida"] = ""
+        st.rerun()
+
+renderizar_calendario_mensal(spreadsheet, st.session_state["mes_ref"])
+
+data = st.session_state["data_escolhida"]
+
+if data:
+    st.info(f"Data selecionada: **{data}**")
+
+    existe, nome_encontrado = aba_existe(spreadsheet, data)
+    pode_processar = not existe
+
+    if existe:
+        st.error(f"A aba '{nome_encontrado}' já existe. O processamento está bloqueado.")
+    else:
+        st.success("Essa data ainda não foi criada.")
+else:
+    st.warning("Selecione um dia vermelho no calendário.")
+    pode_processar = False
+
+if st.button("Processar", disabled=not pode_processar):
     try:
         d = preparar_datas(data)
     except ValueError:
@@ -1651,7 +1769,6 @@ if st.button("Processar"):
 
     # ================= GOOGLE SHEETS =================
     try:
-        spreadsheet = conectar_gsheet()
         ws = obter_ou_criar_aba_data(
             spreadsheet=spreadsheet,
             data_str=data,
@@ -1671,6 +1788,9 @@ if st.button("Processar"):
         )
 
         st.success(f"Aba '{ws.title}' criada e preenchida com sucesso 🚀")
+
+        st.session_state["data_escolhida"] = ""
+        st.rerun()
 
     except Exception as e:
         st.error(f"Erro Google Sheets: {e}")
