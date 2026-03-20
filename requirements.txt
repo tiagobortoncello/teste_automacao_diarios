@@ -6,4 +6,4 @@ pdfplumber
 gspread
 google-auth
 PyMuPDF
-playwright
+playwright==1.49.0
