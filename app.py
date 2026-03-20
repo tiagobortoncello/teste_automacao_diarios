@@ -182,6 +182,76 @@ def escrever_bloco(ws, linha_inicial: int, linhas: list[list], mesclar_coluna_a:
             value_input_option="USER_ENTERED"
         )
 
+def mesclar_linhas_intervalo(ws, linha_inicial: int, qtd_linhas: int, col_inicial: int, col_final: int):
+    if qtd_linhas <= 0:
+        return
+
+    start_row = linha_inicial - 1
+    end_row = linha_inicial + qtd_linhas - 1
+    start_col = col_inicial - 1
+    end_col = col_final  # final inclusivo na entrada / exclusivo na API
+
+    faixa_total = {
+        "sheetId": ws.id,
+        "startRowIndex": start_row,
+        "endRowIndex": end_row,
+        "startColumnIndex": start_col,
+        "endColumnIndex": end_col
+    }
+
+    # tenta desfazer mesclas antigas do intervalo inteiro
+    try:
+        ws.spreadsheet.batch_update({
+            "requests": [
+                {
+                    "unmergeCells": {
+                        "range": faixa_total
+                    }
+                }
+            ]
+        })
+    except Exception:
+        pass
+
+    requests = []
+
+    for linha in range(linha_inicial, linha_inicial + qtd_linhas):
+        faixa_linha = {
+            "sheetId": ws.id,
+            "startRowIndex": linha - 1,
+            "endRowIndex": linha,
+            "startColumnIndex": start_col,
+            "endColumnIndex": end_col
+        }
+
+        requests.append({
+            "mergeCells": {
+                "range": faixa_linha,
+                "mergeType": "MERGE_ALL"
+            }
+        })
+
+        requests.append({
+            "repeatCell": {
+                "range": faixa_linha,
+                "cell": {
+                    "userEnteredFormat": {
+                        "horizontalAlignment": "CENTER",
+                        "verticalAlignment": "MIDDLE",
+                        "textFormat": {
+                            "fontFamily": "Inconsolata",
+                            "fontSize": 10,
+                            "bold": True
+                        }
+                    }
+                },
+                "fields": "userEnteredFormat(horizontalAlignment,verticalAlignment,textFormat)"
+            }
+        })
+
+    if requests:
+        ws.spreadsheet.batch_update({"requests": requests})
+
 def escrever_celula(ws, celula: str, valor):
     ws.update(celula, [[valor]], value_input_option="USER_ENTERED")
 
@@ -495,25 +565,19 @@ def preencher_aba_modelo(
     df_pareceres: pd.DataFrame
 ):
     linha_pareceres = encontrar_linha(ws, "PARECERES", 1) + 1
-    escrever_bloco(
-        ws,
-        linha_pareceres,
-        montar_linhas_pareceres(data_str, df_pareceres, urls["legislativo"])
-    )
+    linhas_pareceres = montar_linhas_pareceres(data_str, df_pareceres, urls["legislativo"])
+    escrever_bloco(ws, linha_pareceres, linhas_pareceres)
+    mesclar_linhas_intervalo(ws, linha_pareceres, len(linhas_pareceres), 8, 15)  # H:O
 
     linha_reqs = encontrar_linha(ws, "REQUERIMENTOS", 1) + 1
-    escrever_bloco(
-        ws,
-        linha_reqs,
-        montar_linhas_requerimentos(data_str, df_reqs, urls["legislativo"])
-    )
+    linhas_reqs = montar_linhas_requerimentos(data_str, df_reqs, urls["legislativo"])
+    escrever_bloco(ws, linha_reqs, linhas_reqs)
+    mesclar_linhas_intervalo(ws, linha_reqs, len(linhas_reqs), 7, 15)  # G:O
 
     linha_props = encontrar_linha(ws, "PROPOSIÇÕES", 1) + 1
-    escrever_bloco(
-        ws,
-        linha_props,
-        montar_linhas_proposicoes(data_str, df_props, urls["legislativo"])
-    )
+    linhas_props = montar_linhas_proposicoes(data_str, df_props, urls["legislativo"])
+    escrever_bloco(ws, linha_props, linhas_props)
+    mesclar_linhas_intervalo(ws, linha_props, len(linhas_props), 7, 15)  # G:O
 
     linha_leg = encontrar_linha(ws, "DIÁRIO DO LEGISLATIVO", 1) + 1
     escrever_bloco(
