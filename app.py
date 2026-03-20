@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 import streamlit as st
 import re
 import pandas as pd
@@ -355,42 +356,69 @@ def baixar_pdf_jornal_mg_por_link(url_pagina: str) -> bytes:
                 f"ObterEdicaoPorDataPublicacao?dataPublicacao={data}"
             )
 
-            session = requests.Session()
+            with sync_playwright() as p:
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage"
+                    ]
+                )
 
-            headers_pagina = {
-                "User-Agent": "Mozilla/5.0",
-                "Referer": "https://www.jornalminasgerais.mg.gov.br/",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-            }
+                context = browser.new_context(
+                    user_agent=(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/122.0.0.0 Safari/537.36"
+                    ),
+                    locale="pt-BR"
+                )
 
-            headers_api = {
-                "User-Agent": "Mozilla/5.0",
-                "Referer": url_pagina,
-                "Accept": "application/json, text/plain, */*"
-            }
+                page = context.new_page()
 
-            # 1) abre a interface normal primeiro
-            resp_pagina = session.get(url_pagina, headers=headers_pagina, timeout=60)
-            resp_pagina.raise_for_status()
+                # 1) abre a página normal do jornal
+                page.goto(url_pagina, wait_until="domcontentloaded", timeout=60000)
+                page.wait_for_timeout(2500)
 
-            # debug opcional
-            st.write("Cookies após abrir página:", session.cookies.get_dict())
+                # 2) chama a API a partir do contexto do navegador
+                resultado = page.evaluate(
+                    """
+                    async ({ apiUrl }) => {
+                        const resp = await fetch(apiUrl, {
+                            method: "GET",
+                            credentials: "include",
+                            headers: {
+                                "accept": "application/json, text/plain, */*"
+                            }
+                        });
 
-            # 2) chama a API com a mesma sessão
-            resp_api = session.get(api_url, headers=headers_api, timeout=60)
+                        const text = await resp.text();
+                        return {
+                            status: resp.status,
+                            text
+                        };
+                    }
+                    """,
+                    {"apiUrl": api_url}
+                )
 
-            st.write("Status API Executivo:", resp_api.status_code)
+                browser.close()
 
-            resp_api.raise_for_status()
+            status = resultado["status"]
+            if status != 200:
+                raise Exception(f"API do Executivo retornou HTTP {status}")
 
-            dados_api = resp_api.json()
+            dados_api = json.loads(resultado["text"])
             base64_pdf = dados_api["dados"]["arquivoCadernoPrincipal"]["arquivo"]
             return base64.b64decode(base64_pdf)
 
+        except PlaywrightTimeoutError as e:
+            ultimo_erro = f"Timeout no Playwright: {e}"
         except Exception as e:
             ultimo_erro = e
-            if tentativa < 2:
-                time.sleep(2 * (tentativa + 1))
+
+        if tentativa < 2:
+            time.sleep(2 * (tentativa + 1))
 
     raise Exception(f"Erro ao obter PDF do Executivo após 3 tentativas: {ultimo_erro}")
 
