@@ -1660,8 +1660,11 @@ with col2:
     mes_ref = st.session_state["mes_ref"]
     st.markdown(f"### {MESES_PT[mes_ref.month - 1]} / {mes_ref.year}")
 
+mes_atual = date.today().replace(day=1)
+
 with col3:
-    if st.button("➡️ Próximo mês"):
+    bloquear_proximo = st.session_state["mes_ref"] >= mes_atual
+    if st.button("➡️ Próximo mês", disabled=bloquear_proximo):
         st.session_state["mes_ref"] = proximo_mes(st.session_state["mes_ref"])
         st.session_state["data_escolhida"] = ""
         st.rerun()
