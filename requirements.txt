@@ -4,6 +4,6 @@ requests
 pypdf
 pdfplumber
 gspread
-oauth2client
+google-auth
 PyMuPDF
-
+playwright
