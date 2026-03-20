@@ -319,12 +319,14 @@ def dias_existentes_no_mes(spreadsheet, ano: int, mes: int) -> set[int]:
 def renderizar_calendario_mensal(spreadsheet, mes_ref: date):
     ano = mes_ref.year
     mes = mes_ref.month
+    hoje = date.today()
+
     dias_existentes = dias_existentes_no_mes(spreadsheet, ano, mes)
 
-    st.markdown("**Legenda:** 🟩 já existe | 🟥 falta criar")
+    st.caption("🟩 já existe | 🟥 falta criar")
 
     cab = st.columns(7)
-    for col, nome in zip(cab, ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]):
+    for col, nome in zip(cab, ["S", "T", "Q", "Q", "S", "S", "D"]):
         col.markdown(f"**{nome}**")
 
     semanas = calendar.monthcalendar(ano, mes)
@@ -335,20 +337,29 @@ def renderizar_calendario_mensal(spreadsheet, mes_ref: date):
             with cols[col_idx]:
                 if dia == 0:
                     st.markdown("&nbsp;", unsafe_allow_html=True)
-                else:
-                    data_txt = f"{dia:02d}/{mes:02d}/{ano}"
-                    existe = dia in dias_existentes
-                    rotulo = f"{'🟩' if existe else '🟥'} {dia:02d}"
+                    continue
 
-                    clicou = st.button(
-                        rotulo,
-                        key=f"dia_{ano}_{mes}_{dia}",
-                        use_container_width=True,
-                        disabled=existe
-                    )
+                data_dia = date(ano, mes, dia)
 
-                    if clicou:
-                        st.session_state["data_escolhida"] = data_txt
+                # não mostra dias futuros
+                if data_dia > hoje:
+                    st.markdown("&nbsp;", unsafe_allow_html=True)
+                    continue
+
+                data_txt = f"{dia:02d}/{mes:02d}/{ano}"
+                existe = dia in dias_existentes
+
+                rotulo = f"{'🟩' if existe else '🟥'} {dia:02d}"
+
+                clicou = st.button(
+                    rotulo,
+                    key=f"dia_{ano}_{mes}_{dia}",
+                    use_container_width=False,
+                    disabled=existe
+                )
+
+                if clicou:
+                    st.session_state["data_escolhida"] = data_txt
 
 # =========================
 # DATA
