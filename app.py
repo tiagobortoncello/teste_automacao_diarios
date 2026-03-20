@@ -1598,7 +1598,6 @@ if data_ajustada != st.session_state["data_ref"]:
         st.session_state["ajuste_msg"] = (
             f"Data ajustada automaticamente para "
             f"{data_ajustada.strftime('%d/%m/%Y')}, "
-            f"pois domingo e segunda remetem ao sábado anterior."
         )
     else:
         st.session_state["ajuste_msg"] = ""
