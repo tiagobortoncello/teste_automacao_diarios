@@ -334,54 +334,53 @@ def baixar(url):
 # EXECUTIVO
 # =========================
 def baixar_pdf_jornal_mg_por_link(url_pagina: str) -> bytes:
-    match = re.search(r'dados=([^&]+)', url_pagina)
-    if not match:
-        raise Exception("Parâmetro dados não encontrado")
+    try:
+        match = re.search(r'dados=([^&]+)', url_pagina)
+        if not match:
+            raise Exception("Parâmetro dados não encontrado")
 
-    dados_codificados = match.group(1)
-    json_str = requests.utils.unquote(dados_codificados)
-    dados = json.loads(json_str)
+        dados_codificados = match.group(1)
+        json_str = requests.utils.unquote(dados_codificados)
+        dados = json.loads(json_str)
 
-    data_iso = dados["dataPublicacaoSelecionada"]
-    data = data_iso.split("T")[0]
+        data_iso = dados["dataPublicacaoSelecionada"]
+        data = data_iso.split("T")[0]
 
-    api_url = (
-        "https://www.jornalminasgerais.mg.gov.br/api/v1/Jornal/"
-        f"ObterEdicaoPorDataPublicacao?dataPublicacao={data}"
-    )
+        api_url = (
+            "https://www.jornalminasgerais.mg.gov.br/api/v1/Jornal/"
+            f"ObterEdicaoPorDataPublicacao?dataPublicacao={data}"
+        )
 
-    headers_base = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json, text/plain, */*"
-    }
+        session = requests.Session()
 
-    session = requests.Session()
+        headers_pagina = {
+            "User-Agent": "Mozilla/5.0",
+            "Referer": "https://www.jornalminasgerais.mg.gov.br/",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
 
-    # 1) visita a interface normal primeiro
-    page_resp = session.get(
-        url_pagina,
-        headers={
-            **headers_base,
-            "Referer": "https://www.jornalminasgerais.mg.gov.br/"
-        },
-        timeout=60
-    )
-    page_resp.raise_for_status()
+        headers_api = {
+            "User-Agent": "Mozilla/5.0",
+            "Referer": url_pagina,
+            "Accept": "application/json, text/plain, */*"
+        }
 
-    # 2) chama a API com a mesma sessão
-    api_resp = session.get(
-        api_url,
-        headers={
-            **headers_base,
-            "Referer": url_pagina
-        },
-        timeout=60
-    )
-    api_resp.raise_for_status()
+        # 1) Abre primeiro a interface normal para criar sessão/contexto
+        resp_pagina = session.get(url_pagina, headers=headers_pagina, timeout=60)
+        resp_pagina.raise_for_status()
 
-    dados_api = api_resp.json()
-    base64_pdf = dados_api["dados"]["arquivoCadernoPrincipal"]["arquivo"]
-    return base64.b64decode(base64_pdf)
+        # 2) Depois chama a API com a mesma sessão
+        resp_api = session.get(api_url, headers=headers_api, timeout=60)
+        resp_api.raise_for_status()
+
+        dados_api = resp_api.json()
+        base64_pdf = dados_api["dados"]["arquivoCadernoPrincipal"]["arquivo"]
+        pdf_bytes = base64.b64decode(base64_pdf)
+
+        return pdf_bytes
+
+    except Exception as e:
+        raise Exception(f"Erro ao obter PDF do Executivo: {e}")
 
 # =========================
 # PREENCHIMENTO DO MODELO
