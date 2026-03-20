@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+import os
+import sys
+import subprocess
 import streamlit as st
 import re
 import pandas as pd
@@ -19,6 +22,23 @@ import time
 # =========================
 PLANILHA_URL = "https://docs.google.com/spreadsheets/d/1XQ8VMo_O5i8KLQWmb_s4xrBuisUQUgdmgQw5xoCu-ms"
 ABA_MODELO = "MODELO"
+
+@st.cache_resource
+def garantir_playwright_chromium():
+    cache_dir = os.path.expanduser("~/.cache/ms-playwright")
+    chromium_ok = False
+
+    if os.path.isdir(cache_dir):
+        try:
+            chromium_ok = any("chromium" in nome.lower() for nome in os.listdir(cache_dir))
+        except Exception:
+            chromium_ok = False
+
+    if not chromium_ok:
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            check=True
+        )
 
 # =========================
 # GOOGLE SHEETS
@@ -375,12 +395,9 @@ def baixar_pdf_jornal_mg_por_link(url_pagina: str) -> bytes:
                 )
 
                 page = context.new_page()
-
-                # 1) abre a página normal do jornal
                 page.goto(url_pagina, wait_until="domcontentloaded", timeout=60000)
                 page.wait_for_timeout(2500)
 
-                # 2) chama a API a partir do contexto do navegador
                 resultado = page.evaluate(
                     """
                     async ({ apiUrl }) => {
@@ -1697,7 +1714,9 @@ if st.button("Processar", disabled=not pode_processar, use_container_width=True)
     df_pareceres = pd.DataFrame()
 
     # ================= EXECUTIVO =================
+        # ================= EXECUTIVO =================
     try:
+        garantir_playwright_chromium()
         pdf_exec = baixar_pdf_jornal_mg_por_link(urls["executivo_html"])
         exec_proc = ExecutiveProcessor(pdf_exec)
         df_exec = exec_proc.process_pdf()
